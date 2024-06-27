@@ -75,7 +75,8 @@ jobs:
           jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
       - name: Update build.json
         run: |
-          jq --arg version "${{ steps.read_version.outputs.version }}" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -137,7 +138,6 @@ jobs:
           else
             echo "No changes to commit"
           fi
-
 
   lint-hadolint:
     if: github.ref != 'refs/heads/main'
@@ -238,7 +238,7 @@ jobs:
         architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
         folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
     outputs:
-      version: ${{ steps.flags.outputs.BUILD_VERSION }}
+      version: ${{ needs.information.outputs.version }}
       name: ${{ needs.information.outputs.name }}
       slug: ${{ needs.information.outputs.slug }}
     steps:
@@ -266,11 +266,11 @@ jobs:
           from=$(yq eval '.build_from["${{ matrix.architecture }}"]' "${{ needs.information.outputs.build }}")
           from=$(echo $from | tr -d '"')
           echo "from=${from}" >> $GITHUB_OUTPUT
-          BUILD_VERSION=$(jq -r '.BUILD_VERSION' ./${{ matrix.folder }}/build.json)
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            BUILD_VERSION="dev-$BUILD_VERSION"
+            VERSION="dev-$VERSION"
           fi
-          echo "BUILD_VERSION=${BUILD_VERSION}" >> $GITHUB_OUTPUT
+          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
           if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
             echo "platform=linux/amd64" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
@@ -312,12 +312,11 @@ jobs:
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
-            BUILD_VERSION=${BUILD_VERSION}
+            BUILD_VERSION=${VERSION}
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
-
 
   publish:
     name: Publish to Repository
@@ -340,7 +339,7 @@ jobs:
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:latest
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:$IMAGE_TAG
           else
-            docker tag $IMAGE_NAME:dev-$IMAGE_TAG $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
+            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:$IMAGE_TAG
           fi
       - name: Push Docker image to GHCR
         run: |
@@ -352,7 +351,7 @@ jobs:
             docker push $IMAGE_REPO_LOWER:latest
             docker push $IMAGE_REPO_LOWER:$IMAGE_TAG
           else
-            docker push $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
+            docker push $IMAGE_REPO_LOWER:$IMAGE_TAG
           fi
       - name: Make GHCR image public
         run: |
@@ -364,7 +363,7 @@ jobs:
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:dev-${{ needs.build.outputs.version }}"
+            IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
           fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
