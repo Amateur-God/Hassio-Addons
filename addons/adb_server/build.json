@@ -1,20 +1,21 @@
 {
-    "build_from": {
-      "aarch64": "ghcr.io/home-assistant/aarch64-base-debian:latest",
-      "amd64": "ghcr.io/home-assistant/amd64-base-debian:latest",
-      "armhf": "ghcr.io/home-assistant/armhf-base-debian:latest",
-      "armv7": "ghcr.io/home-assistant/armv7-base-debian:latest",
-      "i386": "ghcr.io/home-assistant/i386-base-debian:latest"
-    },
-    "squash": true,
-    "args": {
-      "BUILD_ARCH": "amd64",
-      "BUILD_DATE": "2024-06-26",
-      "BUILD_DESCRIPTION": "A Home Assistant add-on for ADB Server with restricted shell access.",
-      "BUILD_FROM": "ghcr.io/home-assistant/amd64-base-debian:latest",
-      "BUILD_NAME": "ADB Server",
-      "BUILD_REF": "main",
-      "BUILD_REPOSITORY": "github.com/Amateur-God/Hassio-Addons",
-      "BUILD_VERSION": "1.0"
-    }
-  }
+  "build_from": {
+    "aarch64": "ghcr.io/home-assistant/aarch64-base-debian:latest",
+    "amd64": "ghcr.io/home-assistant/amd64-base-debian:latest",
+    "armhf": "ghcr.io/home-assistant/armhf-base-debian:latest",
+    "armv7": "ghcr.io/home-assistant/armv7-base-debian:latest",
+    "i386": "ghcr.io/home-assistant/i386-base-debian:latest"
+  },
+  "squash": true,
+  "args": {
+    "BUILD_ARCH": "amd64",
+    "BUILD_DATE": "2024-06-26",
+    "BUILD_DESCRIPTION": "A Home Assistant add-on for ADB Server with restricted shell access.",
+    "BUILD_FROM": "ghcr.io/home-assistant/amd64-base-debian:latest",
+    "BUILD_NAME": "ADB Server",
+    "BUILD_REF": "main",
+    "BUILD_REPOSITORY": "github.com/Amateur-God/Hassio-Addons",
+    "BUILD_VERSION": "1.0"
+  },
+  "version": "1.0.0"
+}
