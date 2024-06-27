@@ -339,7 +339,7 @@ jobs:
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:latest
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:$IMAGE_TAG
           else
-            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:$IMAGE_TAG
+            docker tag $IMAGE_NAME:dev-$IMAGE_TAG $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
           fi
       - name: Push Docker image to GHCR
         run: |
@@ -351,7 +351,7 @@ jobs:
             docker push $IMAGE_REPO_LOWER:latest
             docker push $IMAGE_REPO_LOWER:$IMAGE_TAG
           else
-            docker push $IMAGE_REPO_LOWER:$IMAGE_TAG
+            docker push $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
           fi
       - name: Make GHCR image public
         run: |
