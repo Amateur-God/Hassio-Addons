@@ -289,9 +289,26 @@ jobs:
         run: |
           echo "Pulling base image: ${{ steps.flags.outputs.from }}"
           docker pull ${{ steps.flags.outputs.from }}
-      - name: Build image
-        run: |
-          docker buildx build --cache-from type=local,src=/tmp/.docker-cache --cache-to type=local,dest=/tmp/.docker-cache-new --platform ${{ steps.flags.outputs.platform }} --build-arg BUILD_ARCH=${{ matrix.architecture }} --build-arg BUILD_DATE=${{ steps.flags.outputs.date }} --build-arg BUILD_DESCRIPTION=${{ needs.information.outputs.description }} --build-arg BUILD_FROM=${{ steps.flags.outputs.from }} --build-arg BUILD_NAME=${{ needs.information.outputs.name }} --build-arg BUILD_REF=${{ github.sha }} --build-arg BUILD_REPOSITORY=${{ github.repository }} --build-arg BUILD_VERSION=${{ needs.information.outputs.version }} -t ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}:${{ needs.information.outputs.version }} -f ./${{ matrix.folder }}/Dockerfile ./${{ matrix.folder }}
+          - name: Build
+          uses: docker/build-push-action@v6.2.0
+          with:
+            push: false
+            load: true # Added to ensure the image is loaded into the local Docker daemon
+            context: ./${{ matrix.folder }}
+            file: ./${{ matrix.folder }}/Dockerfile
+            cache-from: |
+              type=local,src=/tmp/.docker-cache
+            cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
+            platforms: ${{ steps.flags.outputs.platform }}
+            build-args: |
+              BUILD_ARCH=${{ matrix.architecture }}
+              BUILD_DATE=${{ steps.flags.outputs.date }}
+              BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
+              BUILD_FROM=${{ steps.flags.outputs.from }}
+              BUILD_NAME=${{ needs.information.outputs.name }}
+              BUILD_REF=${{ github.sha }}
+              BUILD_REPOSITORY=${{ github.repository }}
+              BUILD_VERSION=${{ needs.information.outputs.version }}
       - name: Tag Docker image
         run: |
           IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
