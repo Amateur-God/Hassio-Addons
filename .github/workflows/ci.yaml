@@ -104,10 +104,6 @@ jobs:
   build-and-publish:
     name: Build and Publish ${{ matrix.architecture }}
     needs:
-      - lint-hadolint
-      - lint-json
-      - lint-shellcheck
-      - lint-yamllint
       - information
     runs-on: ubuntu-latest
     strategy:
