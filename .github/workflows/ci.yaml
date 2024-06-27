@@ -279,6 +279,7 @@ jobs:
           else
             echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
             exit 1
+          fi
       - name: Debug - Print 'from' variable
         run: |
           echo "From variable: ${{ steps.flags.outputs.from }}"
