@@ -126,9 +126,10 @@ jobs:
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/$${{ needs.information.outputs.slug }}
+        run: |
+          IMAGE_NAME=${{ needs.information.outputs.slug }}
+          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
+          echo "images=${IMAGE_REPO}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         id: build-and-push
@@ -137,7 +138,7 @@ jobs:
           context: ./${{ matrix.folder }}
           file: ./${{ matrix.folder }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.images }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -150,6 +151,7 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
+
 
       - name: Make GHCR image public
         if: ${{ github.event_name != 'pull_request' }}
