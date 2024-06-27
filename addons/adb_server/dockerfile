@@ -1,11 +1,13 @@
-FROM debian:latest
+ARG BUILD_FROM
+
+FROM ${BUILD_FROM}
 
 RUN apt-get update && \
-    apt-get install -y android-tools-adb wget bash && \
-    apt-get clean
+    apt-get install -y --no-install-recommends android-tools-adb wget bash && \
+    rm -rf /var/lib/apt/lists/*
 
 # Download and install ttyd
-RUN wget https://github.com/tsl0922/ttyd/releases/download/1.6.3/ttyd.x86_64 -O /usr/local/bin/ttyd && \
+RUN wget --quiet https://github.com/tsl0922/ttyd/releases/download/1.6.3/ttyd.x86_64 -O /usr/local/bin/ttyd && \
     chmod +x /usr/local/bin/ttyd
 
 COPY run.sh /run.sh

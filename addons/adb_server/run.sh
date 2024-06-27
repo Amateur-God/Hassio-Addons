@@ -11,7 +11,7 @@ ln -sf /config/.android /root/.android
 ADB_PORT=${ADB_PORT:-5037}
 
 # Start ADB server
-adb -a -P ${ADB_PORT} start-server
+adb -a -P "${ADB_PORT}" start-server
 echo "ADB server started on port ${ADB_PORT}"
 
 # Auto-connect to configured devices

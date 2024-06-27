@@ -1,11 +1,10 @@
 {
   "name": "ADB Server",
-  "version": "1.0",
+  "version": "dev",
   "slug": "adb_server",
   "description": "A Home Assistant add-on for ADB Server with restricted shell access.",
   "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
   "startup": "services",
-  "boot": "auto",
   "ingress": true,
   "ingress_port": 7681,
   "panel_icon": "mdi:android",
@@ -17,7 +16,7 @@
   },
   "host_network": true,
   "map": [
-    "config:rw"
+    "homeassistant_config:rw"
   ],
   "options": {
     "adb_port": 5037,
