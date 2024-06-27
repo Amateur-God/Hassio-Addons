@@ -102,75 +102,107 @@ jobs:
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
   build:
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.architecture }}
     needs:
       - information
-      - discover
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
+    outputs:
+      version: ${{ needs.information.outputs.version }}
+      name: ${{ needs.information.outputs.name }}
+      slug: ${{ needs.information.outputs.slug }}
     steps:
-      - name: Checkout repository
+      - name: Check out code from GitHub
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log into registry ghcr.io
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Set up build cache
+        id: cache
+        uses: actions/cache@v4.0.2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Clean up addon_dirs path
-        id: cleanup
+          path: /tmp/.docker-cache
+          key: docker-${{ matrix.architecture }}-${{ github.sha }}
+          restore-keys: |
+            docker-${{ matrix.architecture }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.3.0
+      - name: Compose build flags
+        id: flags
         run: |
-          CLEAN_PATH=$(echo "${{ needs.information.outputs.addon_dirs }}" | sed 's/^\[\"//;s/\"\]$//')
-          echo "clean_path=${CLEAN_PATH}" >> $GITHUB_ENV
-
-      - name: Extract Docker metadata
-        id: meta
+          echo "date=$(date '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          from=$(yq eval '.build_from["${{ matrix.architecture }}"]' "${{ needs.information.outputs.build }}")
+          from=$(echo $from | tr -d '"')
+          echo "from=${from}" >> $GITHUB_OUTPUT
+          echo "BUILD_VERSION=${{ needs.information.outputs.version }}" >> $GITHUB_OUTPUT
+          if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
+            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
+            echo "platform=linux/386" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "armhf" ]]; then
+            echo "platform=linux/arm/v6" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "armv7" ]]; then
+            echo "platform=linux/arm/v7" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "aarch64" ]]; then
+            echo "platform=linux/arm64/v8" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
+            exit 1
+          fi
+      - name: Debug - Print 'from' variable
         run: |
-          IMAGE_NAME=$(echo "${{ needs.information.outputs.slug }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_REPO="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/$IMAGE_NAME"
-          echo "images=${IMAGE_REPO}" >> $GITHUB_ENV
-          BUILD_REPOSITORY=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "build_repository=${BUILD_REPOSITORY}" >> $GITHUB_ENV
-
-      - name: Build and push Docker image
-        id: build-and-push
+          echo "From variable: ${{ steps.flags.outputs.from }}"
+      - name: Download base image
+        if: steps.flags.outputs.from != 'null'
+        run: |
+          echo "Pulling base image: ${{ steps.flags.outputs.from }}"
+          docker pull ${{ steps.flags.outputs.from }}
+      - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: /${{ env.clean_path }}
-          file: /${{ env.clean_path }}/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.images }}
-          labels: ${{ steps.meta.outputs.labels }}
+          context: ./${{ matrix.folder }}
+          file: ./${{ matrix.folder }}/Dockerfile
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: ${{ steps.flags.outputs.platform }}
           build-args: |
-            BUILD_ARCH=${{ needs.information.outputs.architectures }}
+            BUILD_ARCH=${{ matrix.architecture }}
             BUILD_DATE=${{ steps.flags.outputs.date }}
             BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
             BUILD_FROM=${{ steps.flags.outputs.from }}
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
-            BUILD_REPOSITORY=${{ env.build_repository }}
+            BUILD_REPOSITORY=${{ github.repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
-
-      - name: Make GHCR image public
-        if: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/${{ github.repository_owner }}/$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]'):${{ needs.information.outputs.version }}
+      - name: Swap build cache
         run: |
-          IMAGE_NAME="${{ needs.information.outputs.slug }}"
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
-          IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
-          gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO_LOWER/visibility --field visibility=public
+          rm -rf /tmp/.docker-cache
+          mv /tmp/.docker-cache-new /tmp/.docker-cache
 
+  publish:
+    name: Publish to Repository
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Make GHCR image public
+        run: |
+          IMAGE_NAME="${{ needs.build.outputs.slug }}"
+          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')"
+          gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO/visibility --field visibility=public
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/$(echo ${{ needs.build.outputs.slug }} | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.version }}"
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
           git config --global user.name "github-actions"
@@ -178,10 +210,16 @@ jobs:
           git add $CONFIG_FILE
           git commit -m "Update image link in config.json to $IMAGE_URL"
           git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-
-      - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' }}
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+      - name: Dispatch repository update signal
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: update
+          client-payload: >
+            {
+              "addon": ${{ needs.build.outputs.slug }},
+              "name": ${{ needs.build.outputs.name }},
+              "repository": "${{ github.repository }}",
+              "version": "${{ needs.build.outputs.version }}"
+            }
