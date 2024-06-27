@@ -71,12 +71,14 @@ jobs:
         run: |
           jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
+        env:
+          PAT: ${{ secrets.DISPATCH_TOKEN }}
         run: |
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
-          git push
+          git push https://x-access-token:${PAT}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
@@ -86,6 +88,7 @@ jobs:
           echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
+
 
   lint-addon:
     name: Lint Add-on
