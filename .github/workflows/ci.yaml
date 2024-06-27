@@ -343,11 +343,12 @@ jobs:
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${IMAGE_NAME_LOWER}"
-          docker tag $IMAGE_NAME:latest $IMAGE_REPO:latest
+          docker images
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            docker tag $IMAGE_NAME:latest $IMAGE_REPO:$IMAGE_TAG
+            docker tag $IMAGE_REPO:latest $IMAGE_REPO:$IMAGE_TAG
+            docker tag $IMAGE_REPO:latest $IMAGE_REPO:latest
           else
-            docker tag $IMAGE_NAME:latest $IMAGE_REPO:dev
+            docker tag $IMAGE_REPO:dev $IMAGE_REPO:dev
           fi
       - name: Push Docker image to GHCR
         run: |
@@ -356,9 +357,9 @@ jobs:
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${IMAGE_NAME_LOWER}"
-          docker push $IMAGE_REPO:latest
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             docker push $IMAGE_REPO:$IMAGE_TAG
+            docker push $IMAGE_REPO:latest
           else
             docker push $IMAGE_REPO:dev
           fi
