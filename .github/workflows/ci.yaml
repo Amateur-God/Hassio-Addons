@@ -80,8 +80,7 @@ jobs:
           git config --global user.email "${{ env.GIT_USER_EMAIL }}"
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
-          git push https://x-access-token:${{ env.DISPATCH_TOKEN }}@github.com/${{ github.repository_owner }}/${{ github.repository }}.git HEAD:${{ github.ref }}
-
+          git push https://x-access-token:${{ env.DISPATCH_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
