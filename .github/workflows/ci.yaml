@@ -63,11 +63,11 @@ jobs:
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Ensure version is 'dev-version' for branches
+      - name: Ensure version is 'dev' for branches
         if: github.ref != 'refs/heads/main'
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
-          jq --arg version "dev-$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          jq --arg version "dev" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
       - name: Ensure version is correct for main
         if: github.ref == 'refs/heads/main'
         run: |
@@ -75,7 +75,7 @@ jobs:
           jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
       - name: Update build.json
         run: |
-          jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+          jq --arg version "${{ steps.read_version.outputs.version }}" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,7 +100,7 @@ jobs:
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
   lint-prettier:
-    if:  github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main'
     name: Prettier
     needs: information
     runs-on: ubuntu-latest
@@ -123,8 +123,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  lint-addon:
+    if: github.ref != 'refs/heads/main'
+    name: Lint Add-on
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Add-on Lint
+        uses: frenck/action-addon-linter@v2.15.1
+        with:
+          community: true
+          path: "./${{ matrix.folder }}"
+
   lint-hadolint:
-    if:  github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main'
     name: Hadolint
     needs: information
     runs-on: ubuntu-latest
@@ -147,7 +167,7 @@ jobs:
           config: .hadolint.yaml
 
   lint-json:
-    if:  github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main'
     name: JSON Lint
     needs: information
     runs-on: ubuntu-latest
@@ -166,7 +186,7 @@ jobs:
           cat ./${{ matrix.folder }}/**/*.json | jq '.'
 
   lint-shellcheck:
-    if:  github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main'
     name: Shellcheck
     needs: information
     runs-on: ubuntu-latest
@@ -185,7 +205,7 @@ jobs:
           SHELLCHECK_OPTS: -s bash
 
   lint-yamllint:
-    if:  github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main'
     name: YAMLLint
     needs: information
     runs-on: ubuntu-latest
@@ -211,6 +231,7 @@ jobs:
     needs:
       - information
       - lint-prettier
+      - lint-addon
       - lint-hadolint
       - lint-json
       - lint-shellcheck
@@ -315,7 +336,7 @@ jobs:
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           docker tag $IMAGE_NAME:latest $IMAGE_REPO:latest
-          docker tag $IMAGE_NAME:dev-$IMAGE_TAG $IMAGE_REPO:dev
+          docker tag $IMAGE_NAME:dev $IMAGE_REPO:dev
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             docker tag $IMAGE_NAME:latest $IMAGE_REPO:$IMAGE_TAG
           fi
@@ -325,7 +346,7 @@ jobs:
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           docker push $IMAGE_REPO:latest
-          docker push $IMAGE_REPO:dev-$IMAGE_TAG
+          docker push $IMAGE_REPO:dev
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             docker push $IMAGE_REPO:$IMAGE_TAG
           fi
@@ -335,7 +356,7 @@ jobs:
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME/visibility --field visibility=public
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:dev-${{ needs.build.outputs.version }}"
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:dev"
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
           fi
