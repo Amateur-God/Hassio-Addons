@@ -295,6 +295,7 @@ jobs:
         uses: docker/build-push-action@v6.2.0
         with:
           push: false
+          load: true
           context: ./${{ matrix.folder }}
           file: ./${{ matrix.folder }}/Dockerfile
           cache-from: |
