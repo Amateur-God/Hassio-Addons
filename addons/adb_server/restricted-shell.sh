@@ -1,6 +1,6 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bash
 
-bashio::log.info "Welcome to the ADB Server restricted shell. Only 'adb' commands are allowed."
+echo "Welcome to the ADB Server restricted shell. Only 'adb' commands are allowed."
 
 while true; do
     read -p "# " cmd args
@@ -9,9 +9,9 @@ while true; do
     elif [[ $cmd == "adb" ]]; then
         adb $args
     elif [[ $cmd == "exit" || $cmd == "quit" ]]; then
-        bashio::log.info "Exiting restricted shell."
+        echo "Exiting restricted shell."
         exit 0
     else
-        bashio::log.warning "Only 'adb' commands are allowed."
+        echo "Only 'adb' commands are allowed."
     fi
 done
