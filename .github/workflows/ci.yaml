@@ -243,6 +243,9 @@ jobs:
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
+      - name: Remove all Docker images
+        run: |
+          docker rmi -f $(docker images -aq) || true
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
