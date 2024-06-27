@@ -76,7 +76,11 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Update build.json
         run: |
-          jq --arg version "${{ steps.read_version.outputs.version }}" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            VERSION="dev"
+          fi
+          jq --arg version "$VERSION" '.args.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,6 +103,7 @@ jobs:
           echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
+
   lint-prettier:
     if: github.ref != 'refs/heads/main'
     name: Prettier

@@ -16,6 +16,5 @@
     "BUILD_REF": "main",
     "BUILD_REPOSITORY": "github.com/Amateur-God/Hassio-Addons",
     "BUILD_VERSION": "1.0.1"
-  },
-  "BUILD_VERSION": "1.0.1"
+  }
 }
