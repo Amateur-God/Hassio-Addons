@@ -282,7 +282,6 @@ jobs:
           else
             echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
             exit 1
-          fi
       - name: Debug - Print 'from' variable
         run: |
           echo "From variable: ${{ steps.flags.outputs.from }}"
@@ -315,10 +314,14 @@ jobs:
         run: |
           echo "Built Image Name: ${{ needs.information.outputs.slug }}"
           echo "Built Image Version: ${BUILD_VERSION}"
+      - name: Debug - Print built images
+        run: |
+          docker images
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
+
 
   publish:
     name: Publish to Repository
@@ -344,6 +347,7 @@ jobs:
           else
             docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
           fi
+          docker images
       - name: Push Docker image to GHCR
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
@@ -365,11 +369,6 @@ jobs:
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
-          else
-            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
-          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
             jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
