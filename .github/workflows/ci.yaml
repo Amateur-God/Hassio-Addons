@@ -66,13 +66,14 @@ jobs:
       - name: Ensure version is 'dev' for branches
         if: github.ref != 'refs/heads/main'
         run: |
-          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           jq --arg version "dev" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          echo "version=dev" >> $GITHUB_OUTPUT
       - name: Ensure version is correct for main
         if: github.ref == 'refs/heads/main'
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Update build.json
         run: |
           jq --arg version "${{ steps.read_version.outputs.version }}" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
@@ -98,7 +99,6 @@ jobs:
           echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
-
   lint-prettier:
     if: github.ref != 'refs/heads/main'
     name: Prettier
