@@ -101,148 +101,83 @@ jobs:
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
-  build-and-publish:
-    name: Build and Publish ${{ matrix.architecture }}
+  build:
+    runs-on: ubuntu-latest
     needs:
       - information
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
-        folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
-      - name: Check out code from GitHub
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Remove all Docker images
-        run: |
-          docker rmi -f $(docker images -aq) || true
-      - name: Debug - Print matrix folder path
-        run: |
-          echo "Matrix folder path: ${{ matrix.folder }}"
-      - name: Set up build cache
-        id: cache
-        uses: actions/cache@v4.0.2
-        with:
-          path: /tmp/.docker-cache
-          key: docker-${{ matrix.architecture }}-${{ github.sha }}
-          restore-keys: |
-            docker-${{ matrix.architecture }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.0.0
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.3.0
-      - name: Compose build flags
-        id: flags
-        run: |
-          echo "date=$(date '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-          from=$(yq eval '.build_from["${{ matrix.architecture }}"]' "${{ needs.information.outputs.build }}")
-          from=$(echo $from | tr -d '"')
-          echo "from=${from}" >> $GITHUB_OUTPUT
-          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
-          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_ENV
-          if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
-            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
-            echo "platform=linux/386" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.architecture }}" == "armhf" ]]; then
-            echo "platform=linux/arm/v6" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.architecture }}" == "armv7" ]]; then
-            echo "platform=linux/arm/v7" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.architecture }}" == "aarch64" ]]; then
-            echo "platform=linux/arm64/v8" >> $GITHUB_OUTPUT
-          else
-            echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
-            exit 1
-          fi
-      - name: Debug - Print 'from' variable
-        run: |
-          echo "From variable: ${{ steps.flags.outputs.from }}"
-      - name: Download base image
-        if: steps.flags.outputs.from != 'null'
-        run: |
-          echo "Pulling base image: ${{ steps.flags.outputs.from }}"
-          docker pull ${{ steps.flags.outputs.from }}
-          - name: Build
-          uses: docker/build-push-action@v6.2.0
-          with:
-            push: false
-            load: true # Added to ensure the image is loaded into the local Docker daemon
-            context: ./${{ matrix.folder }}
-            file: ./${{ matrix.folder }}/Dockerfile
-            cache-from: |
-              type=local,src=/tmp/.docker-cache
-            cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
-            platforms: ${{ steps.flags.outputs.platform }}
-            build-args: |
-              BUILD_ARCH=${{ matrix.architecture }}
-              BUILD_DATE=${{ steps.flags.outputs.date }}
-              BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
-              BUILD_FROM=${{ steps.flags.outputs.from }}
-              BUILD_NAME=${{ needs.information.outputs.name }}
-              BUILD_REF=${{ github.sha }}
-              BUILD_REPOSITORY=${{ github.repository }}
-              BUILD_VERSION=${{ needs.information.outputs.version }}
-      - name: Tag Docker image
-        run: |
-          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
-          IMAGE_TAG="${{ needs.information.outputs.version }}"
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
-          IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:latest
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:$IMAGE_TAG
-          docker images
-      - name: Debug - Print built images
-        run: |
-          docker images
-      - name: Swap build cache
-        run: |
-          rm -rf /tmp/.docker-cache
-          mv /tmp/.docker-cache-new /tmp/.docker-cache
-      - name: Log in to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Push Docker image to GHCR
-        run: |
-          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
-          IMAGE_TAG="${{ needs.information.outputs.version }}"
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
-          IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            docker push $IMAGE_REPO_LOWER:latest
-            docker push $IMAGE_REPO_LOWER:$IMAGE_TAG
-          else
-            docker push $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
-          fi
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}
+
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.folder }}
+          file: ./${{ matrix.folder }}/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_ARCH=${{ matrix.architecture }}
+            BUILD_DATE=${{ steps.flags.outputs.date }}
+            BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
+            BUILD_FROM=${{ steps.flags.outputs.from }}
+            BUILD_NAME=${{ needs.information.outputs.name }}
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
+
       - name: Make GHCR image public
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           IMAGE_NAME="${{ needs.information.outputs.slug }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO_LOWER/visibility --field visibility=public
+
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
-          if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
-            jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
-            git config --global user.name "github-actions"
-            git config --global user.email "github-actions@github.com"
-            git add $CONFIG_FILE
-            git commit -m "Update image link in config.json to $IMAGE_URL"
-            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.information.outputs.version }}"
+          else
+            IMAGE_URL="${IMAGE_URL}:${{ needs.information.outputs.version }}"
           fi
-      - name: Dispatch repository update signal
-        uses: peter-evans/repository-dispatch@v1
-        with:
-          token: ${{ secrets.DISPATCH_TOKEN }}
-          repository: ${{ github.repository }}
-          event-type: update
-          client-payload: >
-            {
-              "addon": ${{ needs.information.outputs.slug }},
-              "name": ${{ needs.information.outputs.name }},
-              "repository": "${{ github.repository }}",
-              "version": "${{ needs.information.outputs.version }}"
-            }
+          jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add $CONFIG_FILE
+          git commit -m "Update image link in config.json to $IMAGE_URL"
+          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+
+      - name: Sign the published Docker image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
