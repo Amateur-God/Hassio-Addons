@@ -1,4 +1,3 @@
----
 name: Add-on CI/CD
 
 on:
@@ -77,8 +76,12 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
-          git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
-          git push https://${{ github.actor }}:${{ env.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
@@ -89,7 +92,28 @@ jobs:
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
-
+  lint-prettier:
+    name: Prettier
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.discover.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print addon_dirs
+        run: |
+          echo "addon_dirs: ${{ needs.discover.outputs.addon_dirs }}"
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Prettier
+        uses: creyD/prettier_action@v4.3
+        with:
+          prettier_options: --write ./${{ matrix.folder }}/**/*.{json,js,md,yaml}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   lint-addon:
     name: Lint Add-on
@@ -120,6 +144,9 @@ jobs:
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
+      - name: Ensure newline at end of .hadolint.yaml
+        run: |
+          sed -i -e '$a\' .hadolint.yaml
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
@@ -175,6 +202,9 @@ jobs:
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
+      - name: Ensure newline at end of .yamllint
+        run: |
+          sed -i -e '$a\' .yamllint
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
@@ -273,13 +303,14 @@ jobs:
         run: |
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
-
   publish:
     name: Publish to Repository
     needs:
       - build
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
       - name: Log in to GitHub Container Registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -299,6 +330,18 @@ jobs:
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME/visibility --field visibility=public
+      - name: Ensure correct image link in config.json
+        run: |
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
+          CONFIG_FILE="./${{ matrix.folder }}/config.json"
+          if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
+            jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
+            git config --global user.name "github-actions"
+            git config --global user.email "github-actions@github.com"
+            git add $CONFIG_FILE
+            git commit -m "Update image link in config.json to $IMAGE_URL"
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          fi
       - name: Dispatch repository update signal
         uses: peter-evans/repository-dispatch@v1
         with:
