@@ -128,7 +128,7 @@ jobs:
         id: meta
         run: |
           IMAGE_NAME=$(echo "${{ needs.information.outputs.slug }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
+          IMAGE_REPO="ghcr.io/$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')/$IMAGE_NAME"
           echo "images=${IMAGE_REPO}" >> $GITHUB_ENV
           BUILD_REPOSITORY=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "build_repository=${BUILD_REPOSITORY}" >> $GITHUB_ENV
@@ -153,7 +153,6 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ env.build_repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
-
 
       - name: Make GHCR image public
         if: ${{ github.event_name != 'pull_request' }}
