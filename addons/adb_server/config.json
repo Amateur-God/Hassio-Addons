@@ -1,6 +1,6 @@
 {
   "name": "ADB Server",
-  "version": "dev",
+  "version": "dev-1.0.1",
   "slug": "adb_server",
   "description": "A Home Assistant add-on for ADB Server with restricted shell access.",
   "arch": [
