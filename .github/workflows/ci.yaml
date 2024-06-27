@@ -128,7 +128,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}
+          images: ghcr.io/${{ github.repository_owner }}/$${{ needs.information.outputs.slug }}
 
       - name: Build and push Docker image
         id: build-and-push
