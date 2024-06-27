@@ -124,6 +124,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clean up addon_dirs path
+        id: cleanup
+        run: |
+          CLEAN_PATH=$(echo "${{ needs.information.outputs.addon_dirs }}" | sed 's/^\[\"//;s/\"\]$//')
+          echo "clean_path=${CLEAN_PATH}" >> $GITHUB_ENV
 
       - name: Extract Docker metadata
         id: meta
@@ -138,8 +143,8 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v5
         with:
-          context: ${{ needs.discover.outputs.addon_dirs }}
-          file: ${{ needs.discover.outputs.addon_dirs }}/Dockerfile
+          context: /${{ env.clean_path }}
+          file: /${{ env.clean_path }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.images }}
           labels: ${{ steps.meta.outputs.labels }}
