@@ -238,7 +238,7 @@ jobs:
         architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
         folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
     outputs:
-      version: ${{ steps.flags.outputs.version }}
+      version: ${{ needs.information.outputs.version }}
       name: ${{ needs.information.outputs.name }}
       slug: ${{ needs.information.outputs.slug }}
     steps:
@@ -267,9 +267,6 @@ jobs:
           from=$(echo $from | tr -d '"')
           echo "from=${from}" >> $GITHUB_OUTPUT
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            VERSION="dev-$VERSION"
-          fi
           echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
           if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
             echo "platform=linux/amd64" >> $GITHUB_OUTPUT
@@ -311,7 +308,7 @@ jobs:
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
-            BUILD_VERSION=${{ steps.flags.outputs.version }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
@@ -321,6 +318,7 @@ jobs:
     name: Publish to Repository
     needs:
       - build
+      - information
     runs-on: ubuntu-latest
     steps:
       - name: Check out code from GitHub
@@ -331,7 +329,7 @@ jobs:
       - name: Tag Docker image
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
-          IMAGE_TAG="${{ needs.build.outputs.version }}"
+          IMAGE_TAG="${{ needs.information.outputs.version }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
