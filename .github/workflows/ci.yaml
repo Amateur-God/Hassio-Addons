@@ -50,7 +50,7 @@ jobs:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure all tags are fetched
+          fetch-depth: 10  # Ensure all tags are fetched
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
