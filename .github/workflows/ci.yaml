@@ -72,13 +72,15 @@ jobs:
           jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
         env:
-          PAT: ${{ secrets.DISPATCH_TOKEN }}
+          DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+          GIT_USER_NAME: ${{ secrets.GIT_USER_NAME }}
+          GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
         run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'github-actions@github.com'
+          git config --global user.name "${{ env.GIT_USER_NAME }}"
+          git config --global user.email "${{ env.GIT_USER_EMAIL }}"
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
-          git push https://x-access-token:${PAT}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
+          git push https://x-access-token:${{ env.DISPATCH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
@@ -88,6 +90,7 @@ jobs:
           echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
+
 
 
   lint-addon:
