@@ -162,11 +162,6 @@ jobs:
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.information.outputs.slug }}"
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
-          else
-            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
-          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
           git config --global user.name "github-actions"
