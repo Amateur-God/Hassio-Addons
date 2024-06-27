@@ -225,12 +225,11 @@ jobs:
   build:
     name: Build ${{ matrix.architecture }}
     needs:
-      - information
-      - lint-prettier
       - lint-hadolint
       - lint-json
       - lint-shellcheck
       - lint-yamllint
+      - information
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -266,9 +265,7 @@ jobs:
           from=$(yq eval '.build_from["${{ matrix.architecture }}"]' "${{ needs.information.outputs.build }}")
           from=$(echo $from | tr -d '"')
           echo "from=${from}" >> $GITHUB_OUTPUT
-          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
-          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "BUILD_VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "BUILD_VERSION=${{ needs.information.outputs.version }}" >> $GITHUB_OUTPUT
           if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
             echo "platform=linux/amd64" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
@@ -282,7 +279,6 @@ jobs:
           else
             echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
             exit 1
-          fi
       - name: Debug - Print 'from' variable
         run: |
           echo "From variable: ${{ steps.flags.outputs.from }}"
@@ -295,11 +291,11 @@ jobs:
         uses: docker/build-push-action@v6.2.0
         with:
           push: false
-          load: true
           context: ./${{ matrix.folder }}
           file: ./${{ matrix.folder }}/Dockerfile
           cache-from: |
             type=local,src=/tmp/.docker-cache
+            format('ghcr.io/{0}/{1}/{2}:edge', github.repository_owner, needs.information.outputs.slug, matrix.architecture)
           cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
           platforms: ${{ steps.flags.outputs.platform }}
           build-args: |
@@ -323,12 +319,10 @@ jobs:
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
 
-
   publish:
     name: Publish to Repository
     needs:
       - build
-      - information
     runs-on: ubuntu-latest
     steps:
       - name: Check out code from GitHub
@@ -338,8 +332,10 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Tag Docker image
         run: |
+          # Additional debug statement to verify the tag
+          docker images
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
-          IMAGE_TAG="${{ needs.information.outputs.version }}"
+          IMAGE_TAG="${{ needs.build.outputs.version }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           IMAGE_REPO_LOWER=$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -348,7 +344,6 @@ jobs:
           else
             docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
           fi
-          docker images
       - name: Push Docker image to GHCR
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
@@ -370,6 +365,11 @@ jobs:
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
+          else
+            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
+          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
             jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
