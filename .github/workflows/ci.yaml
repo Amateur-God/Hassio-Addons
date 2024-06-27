@@ -76,8 +76,8 @@ jobs:
           GIT_USER_NAME: ${{ secrets.GIT_USER_NAME }}
           GIT_USER_EMAIL: ${{ secrets.GIT_USER_EMAIL }}
         run: |
-          git config --global user.name "${{ env.GIT_USER_NAME }}"
-          git config --global user.email "${{ env.GIT_USER_EMAIL }}"
+          git config --global user.name ${{ env.GIT_USER_NAME }}
+          git config --global user.email ${{ env.GIT_USER_EMAIL }}
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
           git push https://x-access-token:${{ env.DISPATCH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
