@@ -309,6 +309,10 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
+      - name: Debug - Print built image details
+        run: |
+          echo "Built Image Name: ${{ needs.information.outputs.slug }}"
+          echo "Built Image Version: ${BUILD_VERSION}"
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
