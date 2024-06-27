@@ -238,7 +238,7 @@ jobs:
         architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
         folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
     outputs:
-      version: ${{ needs.information.outputs.version }}
+      version: ${{ steps.flags.outputs.version }}
       name: ${{ needs.information.outputs.name }}
       slug: ${{ needs.information.outputs.slug }}
     steps:
@@ -271,6 +271,7 @@ jobs:
             VERSION="dev-$VERSION"
           fi
           echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
           if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
             echo "platform=linux/amd64" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
@@ -361,10 +362,7 @@ jobs:
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO_LOWER/visibility --field visibility=public
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
-          fi
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
             jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
