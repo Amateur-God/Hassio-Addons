@@ -105,6 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - information
+      - discover
     permissions:
       contents: read
       packages: write
@@ -137,15 +138,15 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v5
         with:
-          context: ./${{ matrix.folder }}
-          file: ./${{ matrix.folder }}/Dockerfile
+          context: ./${{ needs.discover.outputs.addon_dirs }}
+          file: ./${{ needs.discover.outputs.addon_dirs }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.images }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            BUILD_ARCH=${{ matrix.architecture }}
+            BUILD_ARCH=${{ needs.information.outputs.architectures }}
             BUILD_DATE=${{ steps.flags.outputs.date }}
             BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
             BUILD_FROM=${{ steps.flags.outputs.from }}
