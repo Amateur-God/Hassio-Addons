@@ -42,9 +42,9 @@ jobs:
       build: ${{ steps.information.outputs.build }}
       description: ${{ steps.information.outputs.description }}
       name: ${{ steps.information.outputs.name }}
-      slug: ${{ steps.lowercase_slug.outputs.slug }}
+      slug: ${{ steps.information.outputs.slug }}
       target: ${{ steps.information.outputs.target }}
-      version: ${{ steps.set_version.outputs.version }}
+      version: ${{ steps.read_version.outputs.version }}
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
@@ -63,25 +63,20 @@ jobs:
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Set version based on branch
-        id: set_version
+      - name: Ensure version is 'dev' for branches
+        if: github.ref != 'refs/heads/main'
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "version=${{ steps.read_version.outputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=dev" >> $GITHUB_OUTPUT
-          fi
-      - name: Convert slug to lowercase
-        id: lowercase_slug
+          jq --arg version "dev" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          echo "version=dev" >> $GITHUB_ENV
+      - name: Ensure version is correct for main
+        if: github.ref == 'refs/heads/main'
         run: |
-          LOWERCASE_SLUG=$(echo "${{ steps.information.outputs.slug }}" | tr '[:upper:]' '[:lower:]')
-          echo "slug=$LOWERCASE_SLUG" >> $GITHUB_OUTPUT
-      - name: Update config.json with correct version
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          echo "version=$VERSION" >> $GITHUB_ENV
+      - name: Update build.json
         run: |
-          jq --arg version "${{ steps.set_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
-      - name: Update build.json with correct version
-        run: |
-          jq --arg version "${{ steps.set_version.outputs.version }}" '.args.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+          jq --arg version "${{ steps.read_version.outputs.version }}" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
       - name: Commit and push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,19 +86,20 @@ jobs:
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           if ! git diff-index --quiet HEAD; then
             git commit -m "Update version in config.json and build.json"
+            git pull --rebase origin ${{ github.ref_name }}
             git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
           else
             echo "No changes to commit"
-          fi
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
           echo "Build: ${{ steps.information.outputs.build }}"
           echo "Description: ${{ steps.information.outputs.description }}"
           echo "Name: ${{ steps.information.outputs.name }}"
-          echo "Slug: ${{ steps.lowercase_slug.outputs.slug }}"
+          echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
-          echo "Version: ${{ steps.set_version.outputs.version }}"
+          echo "Version: ${{ steps.read_version.outputs.version }}"
+
 
   lint-prettier:
     if: github.ref != 'refs/heads/main'
