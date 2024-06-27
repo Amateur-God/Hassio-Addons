@@ -1,3 +1,4 @@
+---
 name: Add-on CI/CD
 
 on:
@@ -63,9 +64,15 @@ jobs:
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Update config.json
+      - name: Set version to 'dev' for branches
+        if: github.ref != 'refs/heads/main'
         run: |
-          jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          jq --arg version "dev" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+      - name: Set correct version for main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
       - name: Update build.json
         run: |
           jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
@@ -77,7 +84,7 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
           if ! git diff-index --quiet HEAD; then
-            git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
+            git commit -m "Update version in config.json and build.json"
             git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
           else
             echo "No changes to commit"
@@ -93,6 +100,7 @@ jobs:
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
   lint-prettier:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Prettier
     needs: information
     runs-on: ubuntu-latest
@@ -116,6 +124,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   lint-addon:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Lint Add-on
     needs: information
     runs-on: ubuntu-latest
@@ -135,6 +144,7 @@ jobs:
           path: "./${{ matrix.folder }}"
 
   lint-hadolint:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Hadolint
     needs: information
     runs-on: ubuntu-latest
@@ -157,6 +167,7 @@ jobs:
           config: .hadolint.yaml
 
   lint-json:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: JSON Lint
     needs: information
     runs-on: ubuntu-latest
@@ -175,6 +186,7 @@ jobs:
           cat ./${{ matrix.folder }}/**/*.json | jq '.'
 
   lint-shellcheck:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Shellcheck
     needs: information
     runs-on: ubuntu-latest
@@ -193,6 +205,7 @@ jobs:
           SHELLCHECK_OPTS: -s bash
 
   lint-yamllint:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: YAMLLint
     needs: information
     runs-on: ubuntu-latest
@@ -216,11 +229,6 @@ jobs:
   build:
     name: Build ${{ matrix.architecture }}
     needs:
-      - lint-addon
-      - lint-hadolint
-      - lint-json
-      - lint-shellcheck
-      - lint-yamllint
       - information
     runs-on: ubuntu-latest
     strategy:
@@ -271,6 +279,7 @@ jobs:
           else
             echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
             exit 1
+          fi
       - name: Debug - Print 'from' variable
         run: |
           echo "From variable: ${{ steps.flags.outputs.from }}"
@@ -303,6 +312,7 @@ jobs:
         run: |
           rm -rf /tmp/.docker-cache
           mv /tmp/.docker-cache-new /tmp/.docker-cache
+
   publish:
     name: Publish to Repository
     needs:
@@ -319,20 +329,29 @@ jobs:
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           docker tag $IMAGE_NAME:latest ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:latest
-          docker tag $IMAGE_NAME:latest ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$IMAGE_TAG
+          docker tag $IMAGE_NAME:dev ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:dev
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker tag $IMAGE_NAME:latest ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$IMAGE_TAG
+          fi
       - name: Push Docker image to GHCR
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:latest
-          docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$IMAGE_TAG
+          docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:dev
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker push ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME:$IMAGE_TAG
+          fi
       - name: Make GHCR image public
         run: |
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME/visibility --field visibility=public
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:dev"
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
+          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
             jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
