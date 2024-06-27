@@ -271,7 +271,6 @@ jobs:
             VERSION="dev-$VERSION"
           fi
           echo "BUILD_VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
           if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
             echo "platform=linux/amd64" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
@@ -302,7 +301,6 @@ jobs:
           file: ./${{ matrix.folder }}/Dockerfile
           cache-from: |
             type=local,src=/tmp/.docker-cache
-            format('ghcr.io/{0}/{1}/{2}:edge', github.repository_owner, needs.information.outputs.slug, matrix.architecture)
           cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
           platforms: ${{ steps.flags.outputs.platform }}
           build-args: |
@@ -313,7 +311,7 @@ jobs:
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
-            BUILD_VERSION=${VERSION}
+            BUILD_VERSION=${{ steps.flags.outputs.version }}
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
@@ -340,7 +338,7 @@ jobs:
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:latest
             docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:$IMAGE_TAG
           else
-            docker tag $IMAGE_NAME:dev-$IMAGE_TAG $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
+            docker tag $IMAGE_NAME:latest $IMAGE_REPO_LOWER:dev-$IMAGE_TAG
           fi
       - name: Push Docker image to GHCR
         run: |
@@ -363,6 +361,11 @@ jobs:
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}"
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
+          else
+            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
+          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
             jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
