@@ -127,9 +127,11 @@ jobs:
       - name: Extract Docker metadata
         id: meta
         run: |
-          IMAGE_NAME=${{ needs.information.outputs.slug }}
+          IMAGE_NAME=$(echo "${{ needs.information.outputs.slug }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           echo "images=${IMAGE_REPO}" >> $GITHUB_ENV
+          BUILD_REPOSITORY=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "build_repository=${BUILD_REPOSITORY}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         id: build-and-push
@@ -149,7 +151,7 @@ jobs:
             BUILD_FROM=${{ steps.flags.outputs.from }}
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
-            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_REPOSITORY=${{ env.build_repository }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
 
 
