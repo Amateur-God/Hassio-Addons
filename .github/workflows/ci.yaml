@@ -106,13 +106,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        folder: ${{ fromJson(needs.discover.outputs.addon_dirs) }}
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
       - name: Debug - Print addon_dirs
         run: |
-          echo "addon_dirs: ${{ needs.discover.outputs.addon_dirs }}"
+          echo "addon_dirs: ${{ needs.information.outputs.addon_dirs }}"
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
