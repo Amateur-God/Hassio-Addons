@@ -63,9 +63,31 @@ jobs:
         run: |
           VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      - name: Temporarily set version to 'dev' for linting
+      - name: Ensure version is 'dev' for branches
+        if: github.ref != 'refs/heads/main'
         run: |
           jq --arg version "dev" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+      - name: Ensure version is correct for main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+      - name: Update build.json
+        run: |
+          jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Update version in config.json and build.json"
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
@@ -77,7 +99,7 @@ jobs:
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
   lint-prettier:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Prettier
     needs: information
     runs-on: ubuntu-latest
@@ -101,7 +123,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   lint-addon:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Lint Add-on
     needs: information
     runs-on: ubuntu-latest
@@ -121,7 +143,7 @@ jobs:
           path: "./${{ matrix.folder }}"
 
   lint-hadolint:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Hadolint
     needs: information
     runs-on: ubuntu-latest
@@ -144,7 +166,7 @@ jobs:
           config: .hadolint.yaml
 
   lint-json:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: JSON Lint
     needs: information
     runs-on: ubuntu-latest
@@ -163,7 +185,7 @@ jobs:
           cat ./${{ matrix.folder }}/**/*.json | jq '.'
 
   lint-shellcheck:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: Shellcheck
     needs: information
     runs-on: ubuntu-latest
@@ -182,7 +204,7 @@ jobs:
           SHELLCHECK_OPTS: -s bash
 
   lint-yamllint:
-    if:  github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     name: YAMLLint
     needs: information
     runs-on: ubuntu-latest
@@ -207,6 +229,12 @@ jobs:
     name: Build ${{ matrix.architecture }}
     needs:
       - information
+      - lint-prettier
+      - lint-addon
+      - lint-hadolint
+      - lint-json
+      - lint-shellcheck
+      - lint-yamllint
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -256,6 +284,7 @@ jobs:
           else
             echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
             exit 1
+          fi
       - name: Debug - Print 'from' variable
         run: |
           echo "From variable: ${{ steps.flags.outputs.from }}"
