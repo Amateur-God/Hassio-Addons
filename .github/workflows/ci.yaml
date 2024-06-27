@@ -123,6 +123,21 @@ jobs:
           prettier_options: --write ./${{ matrix.folder }}/**/*.{json,js,md,yaml}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Prettified Code!"
+            git pull --rebase origin ${{ github.ref }}
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
+
 
   lint-hadolint:
     if: github.ref != 'refs/heads/main'
