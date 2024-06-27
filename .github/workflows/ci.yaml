@@ -45,12 +45,12 @@ jobs:
       name: ${{ steps.information.outputs.name }}
       slug: ${{ steps.information.outputs.slug }}
       target: ${{ steps.information.outputs.target }}
-      version: ${{ steps.extract_version.outputs.version }}
+      version: ${{ steps.read_version.outputs.version }}
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v4
         with:
-          fetch-depth: 10  # Ensure all tags are fetched
+          fetch-depth: 0  # Ensure all tags are fetched
       - name: Debug - Print matrix folder path
         run: |
           echo "Matrix folder path: ${{ matrix.folder }}"
@@ -59,17 +59,24 @@ jobs:
         uses: frenck/action-addon-information@v1
         with:
           path: "./${{ matrix.folder }}"
-      - name: Extract version from Git tags
-        id: extract_version
+      - name: Read version from version.txt
+        id: read_version
         run: |
-          VERSION=$(git describe --tags --abbrev=0)
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       - name: Update config.json
         run: |
-          jq --arg version "${{ steps.extract_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
       - name: Update build.json
         run: |
-          jq --arg version "${{ steps.extract_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+          jq --arg version "${{ steps.read_version.outputs.version }}" '.version = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+      - name: Commit and push changes
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
+          git commit -m "Update version to ${{ steps.read_version.outputs.version }} in config.json and build.json"
+          git push
       - name: Debug - List extracted information
         run: |
           echo "Architectures: ${{ steps.information.outputs.architectures }}"
@@ -78,7 +85,7 @@ jobs:
           echo "Name: ${{ steps.information.outputs.name }}"
           echo "Slug: ${{ steps.information.outputs.slug }}"
           echo "Target: ${{ steps.information.outputs.target }}"
-          echo "Version: ${{ steps.extract_version.outputs.version }}"
+          echo "Version: ${{ steps.read_version.outputs.version }}"
 
   lint-addon:
     name: Lint Add-on
