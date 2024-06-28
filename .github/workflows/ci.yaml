@@ -163,6 +163,13 @@ jobs:
         run: |
           echo "Pulling base image: ${{ steps.flags.outputs.from }}"
           docker pull ${{ steps.flags.outputs.from }}
+      - name: Convert to Lowercase
+        id: convert
+        run: |
+          SLUG_LOWER=$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]')
+          REPOSITORY_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          echo "slug_lower=$SLUG_LOWER" >> $GITHUB_OUTPUT
+          echo "repository_lower=$REPOSITORY_LOWER" >> $GITHUB_OUTPUT
       - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -178,9 +185,9 @@ jobs:
             BUILD_FROM=${{ steps.flags.outputs.from }}
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
-            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
-          tags: ghcr.io/${{ github.repository_owner }}/$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]'):${{ needs.information.outputs.version }}
+          tags: ghcr.io/${{ github.repository_owner }}/$(echo ${{ steps.convert.outputs.slug_lower }} | tr '[:upper:]' '[:lower:]'):${{ needs.information.outputs.version }}
       - name: Swap build cache
         run: |
           rm -rf /tmp/.docker-cache
