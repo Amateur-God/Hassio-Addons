@@ -278,7 +278,7 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
-            tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}
+          tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}
       - name: Swap build cache
         run: |
           if [ -d /tmp/.docker-cache-new ]; then
