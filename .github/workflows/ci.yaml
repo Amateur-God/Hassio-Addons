@@ -217,7 +217,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/$(echo ${{ needs.build.outputs.slug }} | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.version }}"
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
           jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
           git config --global user.name "github-actions"
