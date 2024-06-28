@@ -1,0 +1,7 @@
+---
+ignored:
+  - DL3008
+  - DL3006
+overrides:
+  DL3003: warning
+  DL4000: {"severity": "info"}

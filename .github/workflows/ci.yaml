@@ -1,0 +1,390 @@
+name: Add-on CI/CD
+
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  discover:
+    name: Discover Add-ons
+    runs-on: ubuntu-latest
+    outputs:
+      addon_dirs: ${{ steps.folders.outputs.addon_dirs }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Find add-on directories
+        id: folders
+        run: |
+          ADDON_DIRS=$(find addons -mindepth 1 -maxdepth 1 -type d | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Found add-on directories: $ADDON_DIRS"
+          echo "addon_dirs=$ADDON_DIRS" >> $GITHUB_OUTPUT
+      - name: Debug - List directories
+        run: |
+          echo "Found add-on directories: ${{ steps.folders.outputs.addon_dirs }}"
+
+  information:
+    name: Gather add-on information
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.discover.outputs.addon_dirs) }}
+    outputs:
+      addon_dirs: ${{ needs.discover.outputs.addon_dirs }}
+      architectures: ${{ steps.information.outputs.architectures }}
+      build: ${{ steps.information.outputs.build }}
+      description: ${{ steps.information.outputs.description }}
+      name: ${{ steps.information.outputs.name }}
+      slug: ${{ steps.information.outputs.slug }}
+      target: ${{ steps.information.outputs.target }}
+      version: ${{ steps.read_version.outputs.version }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure all tags are fetched
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run add-on information action
+        id: information
+        uses: frenck/action-addon-information@v1
+        with:
+          path: "./${{ matrix.folder }}"
+      - name: Read version from version.txt
+        id: read_version
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Ensure version is 'dev-versionnumber' for branches
+        if: github.ref != 'refs/heads/main'
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "dev-$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+      - name: Ensure version is correct for main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.version = $version' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+      - name: Update build.json
+        run: |
+          VERSION=$(cat ./${{ matrix.folder }}/version.txt)
+          jq --arg version "$VERSION" '.BUILD_VERSION = $version' ./${{ matrix.folder }}/build.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/build.json
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Update version in config.json and build.json"
+            git pull --rebase origin ${{ github.ref }}
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
+      - name: Debug - List extracted information
+        run: |
+          echo "Architectures: ${{ steps.information.outputs.architectures }}"
+          echo "Build: ${{ steps.information.outputs.build }}"
+          echo "Description: ${{ steps.information.outputs.description }}"
+          echo "Name: ${{ steps.information.outputs.name }}"
+          echo "Slug: ${{ steps.information.outputs.slug }}"
+          echo "Target: ${{ steps.information.outputs.target }}"
+          echo "Version: ${{ steps.read_version.outputs.version }}"
+
+  lint-hadolint:
+    name: Hadolint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Hadolint
+        uses: brpaz/hadolint-action@v1.5.0
+        with:
+          dockerfile: "./${{ matrix.folder }}/Dockerfile"
+          config: .hadolint.yaml
+
+  lint-json:
+    name: JSON Lint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run JQ
+        run: |
+          shopt -s globstar
+          cat ./${{ matrix.folder }}/**/*.json | jq '.'
+
+  lint-shellcheck:
+    name: Shellcheck
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          SHELLCHECK_OPTS: -s bash
+
+  lint-yamllint:
+    name: YAMLLint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run YAMLLint
+        uses: frenck/action-yamllint@v1.5
+        with:
+          config: .yamllint
+
+  lint-prettier:
+    if: github.ref != 'refs/heads/main'
+    name: Prettier
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print addon_dirs
+        run: |
+          echo "addon_dirs: ${{ needs.information.outputs.addon_dirs }}"
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Prettier
+        uses: creyD/prettier_action@v4.3
+        with:
+          prettier_options: --write ./${{ matrix.folder }}/**/*.{json,js,md,yaml}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Prettified Code!"
+            git pull --rebase origin ${{ github.ref }}
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
+
+  build:
+    name: Build ${{ matrix.architecture }}
+    needs:
+      - lint-prettier
+      - lint-hadolint
+      - lint-json
+      - lint-shellcheck
+      - lint-yamllint
+      - information
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJson(needs.information.outputs.architectures || '["amd64"]') }}
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
+    outputs:
+      version:  ${{ steps.set_version.outputs.version }}
+      slug_lower: ${{ steps.convert.outputs.slug_lower }}
+      repository_owner_lower: ${{ steps.convert.outputs.repository_owner_lower }}
+      folder: ${{ matrix.folder }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v3
+      - name: Set version for branches
+        id: set_version
+        run: |
+          VERSION=${{ needs.information.outputs.version }}
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            VERSION="dev-${VERSION}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Set up build cache
+        id: cache
+        uses: actions/cache@v4.0.2
+        with:
+          path: /tmp/.docker-cache
+          key: docker-${{ matrix.architecture }}-${{ github.sha }}
+          restore-keys: |
+            docker-${{ matrix.architecture }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.0.0
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.3.0
+      - name: Compose build flags
+        id: flags
+        run: |
+          echo "date=$(date '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          from=$(yq eval '.build_from["${{ matrix.architecture }}"]' "${{ needs.information.outputs.build }}")
+          from=$(echo $from | tr -d '"')
+          echo "from=${from}" >> $GITHUB_OUTPUT
+          echo "BUILD_VERSION=${{ needs.information.outputs.version }}" >> $GITHUB_OUTPUT
+          if [[ "${{ matrix.architecture }}" == "amd64" ]]; then
+            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "i386" ]]; then
+            echo "platform=linux/386" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "armhf" ]]; then
+            echo "platform=linux/arm/v6" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "armv7" ]]; then
+            echo "platform=linux/arm/v7" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.architecture }}" == "aarch64" ]]; then
+            echo "platform=linux/arm64/v8" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::Could not determine platform for architecture ${{ matrix.architecture }}"
+            exit 1
+          fi
+      - name: Debug - Print 'from' variable
+        run: |
+          echo "From variable: ${{ steps.flags.outputs.from }}"
+      - name: Download base image
+        if: steps.flags.outputs.from != 'null'
+        run: |
+          echo "Pulling base image: ${{ steps.flags.outputs.from }}"
+          docker pull ${{ steps.flags.outputs.from }}
+      - name: Convert to Lowercase
+        id: convert
+        run: |
+          SLUG_LOWER=$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]')
+          REPOSITORY_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          REPOSITORY_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
+          echo "slug_lower=$SLUG_LOWER" >> $GITHUB_OUTPUT
+          echo "repository_lower=$REPOSITORY_LOWER" >> $GITHUB_OUTPUT
+          echo "repository_owner_lower=$REPOSITORY_OWNER_LOWER" >> $GITHUB_OUTPUT
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v6.2.0
+        with:
+          push: true
+          context: ./${{ matrix.folder }}
+          file: ./${{ matrix.folder }}/Dockerfile
+          platforms: linux/${{ matrix.architecture }}
+          cache-from: |
+            type=local,src=/tmp/.docker-cache
+            format('ghcr.io/{0}/{1}/{2}:edge', github.repository_owner, needs.information.outputs.slug, matrix.architecture)
+          cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
+          build-args: |
+            BUILD_ARCH=${{ matrix.architecture }}
+            BUILD_DATE=${{ steps.flags.outputs.date }}
+            BUILD_DESCRIPTION=${{ needs.information.outputs.description }}
+            BUILD_FROM=${{ steps.flags.outputs.from }}
+            BUILD_NAME=${{ needs.information.outputs.name }}
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
+          tags: |
+              ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+              ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}
+      - name: Add latest tag for main branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }} ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest-${{ matrix.architecture }}
+          docker tag ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }} ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest
+          docker push ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest-${{ matrix.architecture }}
+          docker push ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest
+
+      - name: Swap build cache
+        run: |
+          if [ -d /tmp/.docker-cache-new ]; then
+            rm -rf /tmp/.docker-cache
+            mv /tmp/.docker-cache-new /tmp/.docker-cache
+          else
+            echo "Cache directory /tmp/.docker-cache-new does not exist"
+          fi
+
+  manifest:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Create and Push Docker Manifest
+        run: |
+          docker manifest create ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:latest \
+            --amend ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}-linux-amd64 \
+            --amend ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}-linux-arm64 \
+            --amend ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}-linux-armv7 \
+            --amend ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.version }}-linux-i386
+          docker manifest push ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:latest
+
+
+  update-config:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up jq
+        run: sudo apt-get install jq
+
+      - name: Update config.json with new image URL
+        run: |
+          IMAGE_URL="ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}"
+          jq --arg image "$IMAGE_URL" '.image = $image' ./${{ needs.build.outputs.folder }}/config.json > tmp.json && mv tmp.json ./${{ needs.build.outputs.folder }}/config.json
+
+      - name: Commit and push updated config.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ./${{ needs.build.outputs.folder }}/config.json
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update config.json with new image URL"
+            git pull --rebase origin ${{ github.ref }}
+            git push
+          fi
