@@ -192,8 +192,12 @@ jobs:
           tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ needs.information.outputs.version }}
       - name: Swap build cache
         run: |
-          rm -rf /tmp/.docker-cache
-          mv /tmp/.docker-cache-new /tmp/.docker-cache
+          if [ -d /tmp/.docker-cache-new ]; then
+            rm -rf /tmp/.docker-cache
+            mv /tmp/.docker-cache-new /tmp/.docker-cache
+          else
+            echo "Cache directory /tmp/.docker-cache-new does not exist"
+          fi
 
   publish:
     name: Publish to Repository
