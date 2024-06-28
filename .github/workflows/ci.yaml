@@ -190,6 +190,13 @@ jobs:
             BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
           tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ needs.information.outputs.version }}
+      - name: Debug - Print built image details
+        run: |
+          echo "Built Image Name: ${{ needs.information.outputs.slug }}"
+          echo "Built Image Version: ${BUILD_VERSION}"
+      - name: Debug - Print built images
+        run: |
+          docker images
       - name: Swap build cache
         run: |
           if [ -d /tmp/.docker-cache-new ]; then
@@ -223,6 +230,7 @@ jobs:
           echo "repository_owner_lower=$REPOSITORY_OWNER_LOWER" >> $GITHUB_OUTPUT
       - name: Tag Docker image
         run: |
+          docker images
           IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
           IMAGE_TAG="${{ needs.build.outputs.version }}"
           IMAGE_REPO="ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/$IMAGE_NAME"
