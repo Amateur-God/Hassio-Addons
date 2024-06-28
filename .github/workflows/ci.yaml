@@ -325,9 +325,16 @@ jobs:
             BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
             BUILD_VERSION=${{ needs.information.outputs.version }}
           tags: |
-            ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
-            ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}
-            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/{1}:latest-{2}', steps.convert.outputs.repository_owner_lower, steps.convert.outputs.slug_lower, matrix.architecture) }}
+              ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+              ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}
+      - name: Add latest tag for main branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }} ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest-${{ matrix.architecture }}
+          docker tag ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }} ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest
+          docker push ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest-${{ matrix.architecture }}
+          docker push ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:latest
+
       - name: Swap build cache
         run: |
           if [ -d /tmp/.docker-cache-new ]; then
