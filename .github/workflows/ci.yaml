@@ -356,6 +356,10 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git add ./${{ needs.build.outputs.folder }}/config.json
-          git commit -m "Update config.json with new image URL"
-          git pull --rebase origin ${{ github.ref }}
-          git push
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update config.json with new image URL"
+            git pull --rebase origin ${{ github.ref }}
+            git push
+          fi
