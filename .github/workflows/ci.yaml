@@ -203,28 +203,70 @@ jobs:
     name: Publish to Repository
     needs:
       - build
+      - information
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+
       - name: Log in to GitHub Container Registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Convert to Lowercase
+        id: convert
+        run: |
+          SLUG_LOWER=$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]')
+          REPOSITORY_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          REPOSITORY_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
+          echo "slug_lower=$SLUG_LOWER" >> $GITHUB_OUTPUT
+          echo "repository_lower=$REPOSITORY_LOWER" >> $GITHUB_OUTPUT
+          echo "repository_owner_lower=$REPOSITORY_OWNER_LOWER" >> $GITHUB_OUTPUT
+      - name: Tag Docker image
+        run: |
+          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
+          IMAGE_TAG="${{ needs.build.outputs.version }}"
+          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:latest
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:$IMAGE_TAG
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:dev-$IMAGE_TAG
+
+      - name: Push Docker image to GHCR
+        run: |
+          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
+          IMAGE_TAG="${{ needs.build.outputs.version }}"
+          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
+          docker push $IMAGE_REPO:latest
+          docker push $IMAGE_REPO:$IMAGE_TAG
+          docker push $IMAGE_REPO:dev-$IMAGE_TAG
+
       - name: Make GHCR image public
         run: |
-          IMAGE_NAME="${{ needs.build.outputs.slug }}"
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')"
+          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
+          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO/visibility --field visibility=public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Ensure correct image link in config.json
         run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.slug }}:${{ needs.build.outputs.version }}"
+          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}"
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
+          else
+            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
+          fi
           CONFIG_FILE="./${{ matrix.folder }}/config.json"
-          jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-          git add $CONFIG_FILE
-          git commit -m "Update image link in config.json to $IMAGE_URL"
-          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
+            jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
+            git config --global user.name "github-actions"
+            git config --global user.email "github-actions@github.com"
+            git add $CONFIG_FILE
+            git commit -m "Update image link in config.json to $IMAGE_URL"
+            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Dispatch repository update signal
         uses: peter-evans/repository-dispatch@v1
         with:
