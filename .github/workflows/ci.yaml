@@ -194,7 +194,7 @@ jobs:
       slug: ${{ needs.information.outputs.slug }}
     steps:
       - name: Check out code from GitHub
-        uses: actions/checkout@v4#
+        uses: actions/checkout@v3
       - name: Set version for branches
         id: set_version
         run: |
