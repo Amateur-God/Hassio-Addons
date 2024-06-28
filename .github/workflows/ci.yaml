@@ -215,7 +215,6 @@ jobs:
   build:
     name: Build ${{ matrix.architecture }}
     needs:
-      - lint-prettier
       - lint-hadolint
       - lint-json
       - lint-shellcheck
