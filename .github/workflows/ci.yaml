@@ -231,6 +231,7 @@ jobs:
       version:  ${{ steps.set_version.outputs.version }}
       slug_lower: ${{ steps.convert.outputs.slug_lower }}
       repository_owner_lower: ${{ steps.convert.outputs.repository_owner_lower }}
+      folder: ${{ matrix.folder }}
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v3
@@ -346,7 +347,7 @@ jobs:
       - name: Update config.json with new image URL
         run: |
           IMAGE_URL="ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}"
-          jq --arg image "$IMAGE_URL" '.image = $image' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
+          jq --arg image "$IMAGE_URL" '.image = $image' ./${{ needs.build.outputs.folder }}/config.json > tmp.json && mv tmp.json ./${{ needs.build.outputs.folder }}/config.json
 
       - name: Commit and push updated config.json
         env:
@@ -354,7 +355,7 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git add ./${{ matrix.folder }}/config.json
+          git add ./${{ needs.build.outputs.folder }}/config.json
           git commit -m "Update config.json with new image URL"
           git pull --rebase origin ${{ github.ref }}
           git push
