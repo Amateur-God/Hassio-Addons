@@ -229,8 +229,8 @@ jobs:
         folder: ${{ fromJson(needs.information.outputs.addon_dirs || '["addons/example"]') }}
     outputs:
       version:  ${{ steps.set_version.outputs.version }}
-      name: ${{ needs.information.outputs.name }}
-      slug: ${{ needs.information.outputs.slug }}
+      slug_lower: ${{ steps.convert.outputs.slug_lower }}
+      repository_owner_lower: ${{ steps.convert.outputs.repository_owner_lower }}
     steps:
       - name: Check out code from GitHub
         uses: actions/checkout@v3
@@ -332,9 +332,20 @@ jobs:
           else
             echo "Cache directory /tmp/.docker-cache-new does not exist"
           fi
+
+  update-config:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up jq
+        run: sudo apt-get install jq
+
       - name: Update config.json with new image URL
         run: |
-          IMAGE_URL="ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}"
+          IMAGE_URL="ghcr.io/${{ needs.build.outputs.repository_owner_lower }}/${{ needs.build.outputs.slug_lower }}:${{ needs.build.outputs.version }}"
           jq --arg image "$IMAGE_URL" '.image = $image' ./${{ matrix.folder }}/config.json > tmp.json && mv tmp.json ./${{ matrix.folder }}/config.json
 
       - name: Commit and push updated config.json
