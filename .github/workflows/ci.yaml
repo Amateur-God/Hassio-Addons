@@ -213,6 +213,8 @@ jobs:
           IMAGE_NAME="${{ needs.build.outputs.slug }}"
           IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')"
           gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO/visibility --field visibility=public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure correct image link in config.json
         run: |
           IMAGE_URL="ghcr.io/${{ github.repository_owner }}/$(echo ${{ needs.build.outputs.slug }} | tr '[:upper:]' '[:lower:]'):${{ needs.build.outputs.version }}"
