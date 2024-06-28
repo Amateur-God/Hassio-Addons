@@ -101,11 +101,87 @@ jobs:
           echo "Target: ${{ steps.information.outputs.target }}"
           echo "Version: ${{ steps.read_version.outputs.version }}"
 
+  lint-hadolint:
+    name: Hadolint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Hadolint
+        uses: brpaz/hadolint-action@v1.5.0
+        with:
+          dockerfile: "./${{ matrix.folder }}/Dockerfile"
+          config: .hadolint.yaml
+
+  lint-json:
+    name: JSON Lint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run JQ
+        run: |
+          shopt -s globstar
+          cat ./${{ matrix.folder }}/**/*.json | jq '.'
+
+  lint-shellcheck:
+    name: Shellcheck
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run Shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          SHELLCHECK_OPTS: -s bash
+
+  lint-yamllint:
+    name: YAMLLint
+    needs: information
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4
+      - name: Debug - Print matrix folder path
+        run: |
+          echo "Matrix folder path: ${{ matrix.folder }}"
+      - name: Run YAMLLint
+        uses: frenck/action-yamllint@v1.5
+        with:
+          config: .yamllint
+
   build:
     name: Build ${{ matrix.architecture }}
     needs:
+      - lint-hadolint
+      - lint-json
+      - lint-shellcheck
+      - lint-yamllint
       - information
-      - discover
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -164,22 +240,16 @@ jobs:
         run: |
           echo "Pulling base image: ${{ steps.flags.outputs.from }}"
           docker pull ${{ steps.flags.outputs.from }}
-      - name: Convert to Lowercase
-        id: convert
-        run: |
-          SLUG_LOWER=$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]')
-          REPOSITORY_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
-          REPOSITORY_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
-          echo "slug_lower=$SLUG_LOWER" >> $GITHUB_OUTPUT
-          echo "repository_lower=$REPOSITORY_LOWER" >> $GITHUB_OUTPUT
-          echo "repository_owner_lower=$REPOSITORY_OWNER_LOWER" >> $GITHUB_OUTPUT
       - name: Build and Push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6.2.0
         with:
+          push: false
           context: ./${{ matrix.folder }}
           file: ./${{ matrix.folder }}/Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=local,src=/tmp/.docker-cache
+            format('ghcr.io/{0}/{1}/{2}:edge', github.repository_owner, needs.information.outputs.slug, matrix.architecture)
+          cache-to: type=local,mode=max,dest=/tmp/.docker-cache-new
           platforms: ${{ steps.flags.outputs.platform }}
           build-args: |
             BUILD_ARCH=${{ matrix.architecture }}
@@ -188,16 +258,8 @@ jobs:
             BUILD_FROM=${{ steps.flags.outputs.from }}
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
-            BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
-            BUILD_VERSION=${{ needs.discover.outputs.version }}
-          tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ needs.information.outputs.version }}
-      - name: Debug - Print built image details
-        run: |
-          echo "Built Image Name: ${{ needs.information.outputs.slug }}"
-          echo "Built Image Version: ${BUILD_VERSION}"
-      - name: Debug - Print built images
-        run: |
-          docker images
+            BUILD_REPOSITORY=${{ github.repository }}
+            BUILD_VERSION=${{ needs.information.outputs.version }}
       - name: Swap build cache
         run: |
           if [ -d /tmp/.docker-cache-new ]; then
@@ -214,72 +276,6 @@ jobs:
       - information
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code from GitHub
-        uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Convert to Lowercase
-        id: convert
-        run: |
-          SLUG_LOWER=$(echo ${{ needs.information.outputs.slug }} | tr '[:upper:]' '[:lower:]')
-          REPOSITORY_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
-          REPOSITORY_OWNER_LOWER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')
-          echo "slug_lower=$SLUG_LOWER" >> $GITHUB_OUTPUT
-          echo "repository_lower=$REPOSITORY_LOWER" >> $GITHUB_OUTPUT
-          echo "repository_owner_lower=$REPOSITORY_OWNER_LOWER" >> $GITHUB_OUTPUT
-      - name: Tag Docker image
-        run: |
-          docker images
-          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
-          IMAGE_TAG="${{ needs.build.outputs.version }}"
-          IMAGE_REPO="ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/$IMAGE_NAME"
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:latest
-            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:$IMAGE_TAG
-          else
-            docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_REPO:dev-$IMAGE_TAG
-          fi
-      - name: Push Docker image to GHCR
-        run: |
-          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
-          IMAGE_TAG="${{ needs.build.outputs.version }}"
-          IMAGE_REPO="ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/$IMAGE_NAME"
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            docker push $IMAGE_REPO:latest
-            docker push $IMAGE_REPO:$IMAGE_TAG
-          else
-            docker push $IMAGE_REPO:dev-$IMAGE_TAG
-          fi
-      - name: Make GHCR image public
-        run: |
-          IMAGE_NAME="${{ steps.convert.outputs.slug_lower }}"
-          IMAGE_REPO="ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME"
-          gh api --method PATCH -H "Accept: application/vnd.github.v3+json" /user/packages/container/$IMAGE_REPO/visibility --field visibility=public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Ensure correct image link in config.json
-        run: |
-          IMAGE_URL="ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}"
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            IMAGE_URL="${IMAGE_URL}:dev-${{ needs.build.outputs.version }}"
-          else
-            IMAGE_URL="${IMAGE_URL}:${{ needs.build.outputs.version }}"
-          fi
-          CONFIG_FILE="./${{ matrix.folder }}/config.json"
-          if ! grep -q "\"image\": \"$IMAGE_URL\"" $CONFIG_FILE; then
-            jq --arg image "$IMAGE_URL" '.image = $image' $CONFIG_FILE > tmp.$$.json && mv tmp.$$.json $CONFIG_FILE
-            git config --global user.name "github-actions"
-            git config --global user.email "github-actions@github.com"
-            git add $CONFIG_FILE
-            git commit -m "Update image link in config.json to $IMAGE_URL"
-            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Dispatch repository update signal
         uses: peter-evans/repository-dispatch@v1
         with:
