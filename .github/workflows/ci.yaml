@@ -105,6 +105,7 @@ jobs:
     name: Build ${{ matrix.architecture }}
     needs:
       - information
+      - discover
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -188,7 +189,7 @@ jobs:
             BUILD_NAME=${{ needs.information.outputs.name }}
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ steps.convert.outputs.repository_lower }}
-            BUILD_VERSION=${{ needs.information.outputs.version }}
+            BUILD_VERSION=${{ needs.discover.outputs.version }}
           tags: ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ needs.information.outputs.version }}
       - name: Debug - Print built image details
         run: |
