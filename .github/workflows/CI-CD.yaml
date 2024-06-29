@@ -269,6 +269,12 @@
           with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v2
+          with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.GITHUB_TOKEN }}
         - name: Set up Docker Buildx
           uses: docker/setup-buildx-action@v3.3.0
         - name: Compose build flags
@@ -330,6 +336,7 @@
               BUILD_VERSION=${{ needs.information.outputs.version }}
             tags: |
                 ${{ secrets.DOCKER_USERNAME }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+                ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
         - name: Swap build cache
           run: |
             if [ -d /tmp/.docker-cache-new ]; then
@@ -390,6 +397,12 @@
           with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v2
+          with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.GITHUB_TOKEN }}
         - name: Set up Docker Buildx
           uses: docker/setup-buildx-action@v3.3.0
         - name: Compose build flags
@@ -451,6 +464,7 @@
               BUILD_VERSION=${{ needs.information.outputs.version }}
             tags: |
                 ${{ secrets.DOCKER_USERNAME }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+                ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
         - name: Swap build cache
           run: |
             if [ -d /tmp/.docker-cache-new ]; then
@@ -476,7 +490,12 @@
           with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
-
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v2
+          with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.GITHUB_TOKEN }}
         - name: Create and Push Docker Manifest latest
           run: |
             IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
@@ -501,9 +520,34 @@
                 $IMAGE_NAME:$VERSION-armhf \
                 $IMAGE_NAME:$VERSION-i386 \
                 $IMAGE_NAME:$VERSION-armv7
+        - name: Create and Push Docker Manifest latest to GHCR
+          run: |
+            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
+            VERSION="${{ needs.build_main_or_pr.outputs.version }}"
+
+            docker buildx imagetools create \
+                -t $IMAGE_NAME:latest \
+                $IMAGE_NAME:$VERSION-amd64 \
+                $IMAGE_NAME:$VERSION-aarch64 \
+                $IMAGE_NAME:$VERSION-armhf \
+                $IMAGE_NAME:$VERSION-i386 \
+                $IMAGE_NAME:$VERSION-armv7
+
+        - name: Create and Push Docker Manifest Version to GHCR
+          run: |
+            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
+            VERSION="${{ needs.build_main_or_pr.outputs.version }}"
+
+            docker buildx imagetools create \
+                -t $IMAGE_NAME:$VERSION \
+                $IMAGE_NAME:$VERSION-amd64 \
+                $IMAGE_NAME:$VERSION-aarch64 \
+                $IMAGE_NAME:$VERSION-armhf \
+                $IMAGE_NAME:$VERSION-i386 \
+                $IMAGE_NAME:$VERSION-armv7
 
     create_and_push_manifest_dev:
-      name: Create and Push Docker Manifest
+      name: Create and Push Docker Manifest (Development)
       runs-on: ubuntu-latest
       needs: build_other_branches
       steps:
@@ -519,7 +563,14 @@
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
 
-        - name: Create and Push Docker Manifest dev
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v2
+          with:
+            registry: ghcr.io
+            username: ${{ github.repository_owner }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Create and Push Docker Manifest dev to DockerHub
           run: |
             IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ needs.build_other_branches.outputs.slug_lower }}"
             VERSION="${{ needs.build_other_branches.outputs.version }}"
@@ -532,7 +583,7 @@
                 $IMAGE_NAME:$VERSION-i386 \
                 $IMAGE_NAME:$VERSION-armv7
 
-        - name: Create and Push Docker Manifest version
+        - name: Create and Push Docker Manifest version to DockerHub
           run: |
             IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ needs.build_other_branches.outputs.slug_lower }}"
             VERSION="${{ needs.build_other_branches.outputs.version }}"
@@ -544,6 +595,33 @@
                 $IMAGE_NAME:$VERSION-armhf \
                 $IMAGE_NAME:$VERSION-i386 \
                 $IMAGE_NAME:$VERSION-armv7
+
+        - name: Create and Push Docker Manifest dev to GHCR
+          run: |
+            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_other_branches.outputs.slug_lower }}"
+            VERSION="${{ needs.build_other_branches.outputs.version }}"
+
+            docker buildx imagetools create \
+                -t $IMAGE_NAME:DEV \
+                $IMAGE_NAME:$VERSION-amd64 \
+                $IMAGE_NAME:$VERSION-aarch64 \
+                $IMAGE_NAME:$VERSION-armhf \
+                $IMAGE_NAME:$VERSION-i386 \
+                $IMAGE_NAME:$VERSION-armv7
+
+        - name: Create and Push Docker Manifest version to GHCR
+          run: |
+            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_other_branches.outputs.slug_lower }}"
+            VERSION="${{ needs.build_other_branches.outputs.version }}"
+
+            docker buildx imagetools create \
+                -t $IMAGE_NAME:$VERSION \
+                $IMAGE_NAME:$VERSION-amd64 \
+                $IMAGE_NAME:$VERSION-aarch64 \
+                $IMAGE_NAME:$VERSION-armhf \
+                $IMAGE_NAME:$VERSION-i386 \
+                $IMAGE_NAME:$VERSION-armv7
+
 
     update_config_main_or_pr:
       runs-on: ubuntu-latest
