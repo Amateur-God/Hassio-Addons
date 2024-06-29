@@ -565,18 +565,19 @@
           run: |
             git config --global user.name "github-actions"
             git config --global user.email "github-actions@github.com"
-            git add ./${{ needs.build_main_or_pr.outputs.folder }}/config.json
-            git add ./${{ needs.build_main_or_pr.outputs.folder }}/build.json
+            git add ./${{ needs.build_other_branches.outputs.folder }}/config.json
+            git add ./${{ needs.build_other_branches.outputs.folder }}/build.json
             if git diff-index --quiet HEAD; then
               echo "No changes to commit"
             else
               git fetch origin
-              git rebase origin/${{ github.ref }}
+              git rebase origin/${{ github.ref#refs/heads/ }}
               if [ $? -ne 0 ]; then
                 echo "Rebase failed, attempting to resolve conflicts"
                 git rebase --abort
-                git pull origin ${{ github.ref }}
+                git pull origin ${{ github.ref#refs/heads/ }}
               fi
+              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref#refs/heads/ }}
             fi
 
     update_config_other_branches:
@@ -609,10 +610,11 @@
               echo "No changes to commit"
             else
               git fetch origin
-              git rebase origin/${{ github.ref }}
+              git rebase origin/${{ github.ref#refs/heads/ }}
               if [ $? -ne 0 ]; then
                 echo "Rebase failed, attempting to resolve conflicts"
                 git rebase --abort
-                git pull origin ${{ github.ref }}
+                git pull origin ${{ github.ref#refs/heads/ }}
               fi
+              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref#refs/heads/ }}
             fi
