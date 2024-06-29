@@ -11,7 +11,7 @@ ln -sf /config/.android /root/.android
 ADB_PORT=${ADB_PORT:-5037}
 
 # Start ADB server
-adb -a -P ${ADB_PORT} start-server
+adb -a -P "${ADB_PORT}" start-server
 echo "ADB server started on port ${ADB_PORT}"
 
 # Auto-connect to configured devices
@@ -27,8 +27,8 @@ fi
 echo "Connected devices:"
 adb devices -l
 
-# Start ttyd with restricted shell
-ttyd -p 7681 /usr/local/bin/restricted-shell.sh &
+# Start ttyd with writable mode and restricted shell
+ttyd -p 7681 --writable /usr/local/bin/restricted-shell.sh &
 
 # Keep the add-on running
 tail -f /dev/null
