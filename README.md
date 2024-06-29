@@ -17,6 +17,7 @@
 [![Discord][discord-shield]][discord]
 <!--[![Community Forum][forum-shield]][forum]
 -->
+[![Docker Pulls][docker-pulls-shield]][docker-pulls]
 ## About
 
 Welcome to Amateur-God's Home Assistant Add-ons. This repository hosts the ADB-Server add-on, which provides an Android Debug Bridge (ADB) server for Home Assistant, including an ingress terminal for executing commands.
@@ -172,3 +173,5 @@ You should have received a copy of the GNU General Public License along with thi
 [releases-shield]: https://img.shields.io/github/release/Amateur-God/Hassio-Addons.svg
 [releases]: https://github.com/Amateur-God/Hassio-Addons/releases
 [repository]: https://github.com/Amateur-God/Hassio-Addons
+[docker-pulls-shield]: https://img.shields.io/docker/pulls/amateurgod/adb_server
+[docker-pulls]: https://hub.docker.com/r/amateurgod/adb_server
