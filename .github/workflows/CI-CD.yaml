@@ -477,7 +477,7 @@
                 $IMAGE_NAME:$VERSION-armv7
         - name: Create and Push Docker Manifest latest to GHCR
           run: |
-            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
+            IMAGE_NAME="ghcr.io/${{ needs.build_main_or_pr.outputs.repository_owner_lower }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
             VERSION="${{ needs.build_main_or_pr.outputs.version }}"
 
             docker buildx imagetools create \
@@ -490,7 +490,7 @@
 
         - name: Create and Push Docker Manifest Version to GHCR
           run: |
-            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
+            IMAGE_NAME="ghcr.io/${{ needs.build_main_or_pr.outputs.repository_owner_lower }}/${{ needs.build_main_or_pr.outputs.slug_lower }}"
             VERSION="${{ needs.build_main_or_pr.outputs.version }}"
 
             docker buildx imagetools create \
@@ -553,7 +553,7 @@
 
         - name: Create and Push Docker Manifest dev to GHCR
           run: |
-            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_other_branches.outputs.slug_lower }}"
+            IMAGE_NAME="ghcr.io/${{ needs.build_other_branches.outputs.repository_owner_lower }}/${{ needs.build_other_branches.outputs.slug_lower }}"
             VERSION="${{ needs.build_other_branches.outputs.version }}"
 
             docker buildx imagetools create \
@@ -566,7 +566,7 @@
 
         - name: Create and Push Docker Manifest version to GHCR
           run: |
-            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/${{ needs.build_other_branches.outputs.slug_lower }}"
+            IMAGE_NAME="ghcr.io/${{ needs.build_other_branches.outputs.repository_owner_lower }}/${{ needs.build_other_branches.outputs.slug_lower }}"
             VERSION="${{ needs.build_other_branches.outputs.version }}"
 
             docker buildx imagetools create \
