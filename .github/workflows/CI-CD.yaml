@@ -85,9 +85,13 @@
             git config --global user.name "github-actions"
             git config --global user.email "github-actions@github.com"
             git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
-            git commit -m "Update version in config and build files"
-            git pull origin ${{ github.ref }}
-            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+            if ! git diff-index --quiet HEAD; then
+              git commit -m "Update version in config.json and build.json"
+              git pull origin ${{ github.ref }}
+              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+            else
+              echo "No changes to commit"
+            fi
         - name: Debug - List extracted information
           run: |
             echo "Architectures: ${{ steps.information.outputs.architectures }}"
