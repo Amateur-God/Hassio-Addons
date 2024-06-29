@@ -246,9 +246,9 @@
 
     build_main_or_pr:
       name: Build ${{ matrix.architecture }} (Main or PR)
+      if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && ${{ needs.information.outputs.version_changed }} == 'true') || (github.event_name == 'pull_request' && ${{ needs.information.outputs.version_changed }} == 'true')
       needs:
         information
-      if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && ${{ needs.information.outputs.version_changed }} == 'true') || (github.event_name == 'pull_request' && ${{ needs.information.outputs.version_changed }} == 'true')
       runs-on: ubuntu-latest
       strategy:
         fail-fast: false
@@ -362,7 +362,7 @@
 
     build_other_branches:
       name: Build ${{ matrix.architecture }} (Other Branches)
-      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && && ${{ needs.information.outputs.version_changed }} == 'true'
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && ${{ needs.information.outputs.version_changed }} == 'true'
       needs:
         - information
         - lint-hadolint
