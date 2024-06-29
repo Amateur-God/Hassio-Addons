@@ -232,7 +232,13 @@
             git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
             if ! git diff-index --quiet HEAD; then
               git commit -m "Prettified Code!"
-              git pull origin ${{ github.ref }}
+              git fetch origin
+              git rebase origin/${{ github.ref }}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${{ github.ref }}
+              fi
               git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
             else
               echo "No changes to commit"
