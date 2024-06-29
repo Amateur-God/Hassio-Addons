@@ -595,9 +595,13 @@
             if git diff-index --quiet HEAD; then
               echo "No changes to commit"
             else
-              git commit -m "Update config.json with new image URL and build.json with build date"
-              git pull --rebase origin ${{ github.ref }}
-              git push
+              git fetch origin
+              git rebase origin/${{ github.ref }}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${{ github.ref }}
+              fi
             fi
 
     update_config_other_branches:
@@ -629,7 +633,11 @@
             if git diff-index --quiet HEAD; then
               echo "No changes to commit"
             else
-              git commit -m "Update config.json with new image URL and build.json with build date"
-              git pull --rebase origin ${{ github.ref }}
-              git push
+              git fetch origin
+              git rebase origin/${{ github.ref }}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${{ github.ref }}
+              fi
             fi
