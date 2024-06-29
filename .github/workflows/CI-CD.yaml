@@ -87,7 +87,7 @@
             git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
             if ! git diff-index --quiet HEAD; then
               git commit -m "Update version in config.json and build.json"
-              git pull --rebase origin ${{ github.ref }}
+              git pull origin ${{ github.ref }}
               git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
             else
               echo "No changes to commit"
@@ -211,7 +211,13 @@
             git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
             if ! git diff-index --quiet HEAD; then
               git commit -m "Prettified Code!"
-              git pull --rebase origin ${{ github.ref }}
+              git fetch origin
+              git rebase origin/${{ github.ref }}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${{ github.ref }}
+              fi
               git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
             else
               echo "No changes to commit"
@@ -219,7 +225,7 @@
 
     build_main_or_pr:
       name: Build ${{ matrix.architecture }} (Main or PR)
-      if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'pull_request'
+      if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request')
       needs:
         information
       runs-on: ubuntu-latest
@@ -458,7 +464,6 @@
       name: Create and Push Docker Manifest
       runs-on: ubuntu-latest
       needs: build_main_or_pr
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       steps:
         - name: Check out code from GitHub
           uses: actions/checkout@v4
@@ -501,7 +506,6 @@
       name: Create and Push Docker Manifest
       runs-on: ubuntu-latest
       needs: build_other_branches
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       steps:
         - name: Check out code from GitHub
           uses: actions/checkout@v4
@@ -571,8 +575,15 @@
               echo "No changes to commit"
             else
               git commit -m "Update config.json with new image URL and build.json with build date"
-              git pull --rebase origin ${{ github.ref }}
-              git push
+              git fetch origin
+              BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
+              git rebase origin/${BRANCH_NAME}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${BRANCH_NAME}
+              fi
+              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${BRANCH_NAME}
             fi
 
     update_config_other_branches:
@@ -605,6 +616,13 @@
               echo "No changes to commit"
             else
               git commit -m "Update config.json with new image URL and build.json with build date"
-              git pull --rebase origin ${{ github.ref }}
-              git push
+              git fetch origin
+              BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
+              git rebase origin/${BRANCH_NAME}
+              if [ $? -ne 0 ]; then
+                echo "Rebase failed, attempting to resolve conflicts"
+                git rebase --abort
+                git pull origin ${BRANCH_NAME}
+              fi
+              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${BRANCH_NAME}
             fi
