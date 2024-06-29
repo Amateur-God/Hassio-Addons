@@ -13,6 +13,6 @@
     "BUILD_NAME": "ADB Server",
     "BUILD_REF": "main",
     "BUILD_REPOSITORY": "github.com/Amateur-God/Hassio-Addons",
-    "BUILD_VERSION": "123.123.213"
+    "BUILD_VERSION": "1.1.1"
   }
 }
