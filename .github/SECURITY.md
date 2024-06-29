@@ -43,7 +43,7 @@ Oh, and if we ever meet, I'm happy to buy you a beer :)
 
 ## Contact Information
 
-Please contact me, Amateur-God, directly <!---at: --->
+Please contact me, Amateur-God, directly.
 
 <!---security@frenck.dev (not for support!)--->
 
