@@ -23,7 +23,7 @@ RUN case "$TARGETARCH" in \
     "386") TINI_URL="https://github.com/krallin/tini/releases/download/v0.19.0/tini-i386";; \
     *) echo "Unsupported architecture: $TARGETARCH" && exit 1;; \
     esac && \
-    wget -O /usr/bin/tini $TINI_URL && \
+    wget -q -O /usr/bin/tini $TINI_URL && \
     chmod +x /usr/bin/tini
 
 COPY run.sh /run.sh
