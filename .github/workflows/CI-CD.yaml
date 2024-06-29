@@ -292,7 +292,7 @@
               BUILD_VERSION=${{ needs.information.outputs.version }}
             tags: |
                 ${{ secrets.DOCKER_USERNAME }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
-                ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+                ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
         - name: Swap build cache
           run: |
             if [ -d /tmp/.docker-cache-new ]; then
@@ -419,7 +419,7 @@
               BUILD_VERSION=${{ needs.information.outputs.version }}
             tags: |
                 ${{ secrets.DOCKER_USERNAME }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
-                ghcr.io/${{ github.repository_owner }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
+                ghcr.io/${{ steps.convert.outputs.repository_owner_lower }}/${{ steps.convert.outputs.slug_lower }}:${{ steps.set_version.outputs.version }}-${{ matrix.architecture }}
         - name: Swap build cache
           run: |
             if [ -d /tmp/.docker-cache-new ]; then
