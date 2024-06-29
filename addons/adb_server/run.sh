@@ -27,8 +27,8 @@ fi
 echo "Connected devices:"
 adb devices -l
 
-# Start ttyd with restricted shell
-ttyd -p 7681 /usr/local/bin/restricted-shell.sh &
+# Start ttyd with writable mode and restricted shell
+ttyd -p 7681 --writable /usr/local/bin/restricted-shell.sh &
 
 # Keep the add-on running
 tail -f /dev/null
