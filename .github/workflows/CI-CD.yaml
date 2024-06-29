@@ -179,50 +179,6 @@
           with:
             config: .yamllint
 
-    lint-prettier:
-      name: Prettier
-      if: github.ref != 'refs/heads/main' && github.event_name == 'push'
-      needs: information
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          folder: ${{ fromJson(needs.information.outputs.addon_dirs) }}
-      steps:
-        - name: Check out code from GitHub
-          uses: actions/checkout@v4
-        - name: Debug - Print addon_dirs
-          run: |
-            echo "addon_dirs: ${{ needs.information.outputs.addon_dirs }}"
-        - name: Debug - Print matrix folder path
-          run: |
-            echo "Matrix folder path: ${{ matrix.folder }}"
-        - name: Run Prettier
-          uses: creyD/prettier_action@v4.3
-          with:
-            prettier_options: --write ./${{ matrix.folder }}/**/*.{json,js,md,yaml}
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Commit and push changes
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            git config --global user.name "github-actions"
-            git config --global user.email "github-actions@github.com"
-            git add ./${{ matrix.folder }}/config.json ./${{ matrix.folder }}/build.json
-            if ! git diff-index --quiet HEAD; then
-              git commit -m "Prettified Code!"
-              git fetch origin
-              git rebase origin/${{ github.ref }}
-              if [ $? -ne 0 ]; then
-                echo "Rebase failed, attempting to resolve conflicts"
-                git rebase --abort
-                git pull origin ${{ github.ref }}
-              fi
-              git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-            else
-              echo "No changes to commit"
-            fi
-
     build_main_or_pr:
       name: Build ${{ matrix.architecture }} (Main or PR)
       if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request')
@@ -355,7 +311,6 @@
         - lint-json
         - lint-shellcheck
         - lint-yamllint
-        - lint-prettier
       runs-on: ubuntu-latest
       strategy:
         fail-fast: false
