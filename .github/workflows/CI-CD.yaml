@@ -574,6 +574,7 @@
             if git diff-index --quiet HEAD; then
               echo "No changes to commit"
             else
+              git commit -m "Update config.json with new image URL and build.json with build date"
               git fetch origin
               BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
               git rebase origin/${BRANCH_NAME}
@@ -614,6 +615,7 @@
             if git diff-index --quiet HEAD; then
               echo "No changes to commit"
             else
+              git commit -m "Update config.json with new image URL and build.json with build date"
               git fetch origin
               BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\///')
               git rebase origin/${BRANCH_NAME}
