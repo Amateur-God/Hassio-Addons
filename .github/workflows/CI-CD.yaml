@@ -362,6 +362,7 @@
 
     build_other_branches:
       name: Build ${{ matrix.architecture }} (Other Branches)
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && && ${{ needs.information.outputs.version_changed }} == 'true'
       needs:
         - information
         - lint-hadolint
@@ -369,7 +370,6 @@
         - lint-shellcheck
         - lint-yamllint
         - lint-prettier
-      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && && ${{ needs.information.outputs.version_changed }} == 'true'
       runs-on: ubuntu-latest
       strategy:
         fail-fast: false
