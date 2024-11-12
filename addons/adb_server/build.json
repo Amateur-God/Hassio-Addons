@@ -8,7 +8,7 @@
   },
   "squash": true,
   "args": {
-    "BUILD_DATE": "2024-07-28T22:32:11Z",
+    "BUILD_DATE": "2024-11-12T23:03:37Z",
     "BUILD_DESCRIPTION": "A Home Assistant add-on for ADB Server with restricted shell access.",
     "BUILD_NAME": "ADB Server",
     "BUILD_REF": "main",
