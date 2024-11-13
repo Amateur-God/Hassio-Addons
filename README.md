@@ -62,26 +62,6 @@ Key features include:
    - Find the ADB-Server add-on in the list and click on it.
    - Click on the `Install` button.
 
-3. **Configure the Add-on:**
-   - Go to the `Configuration` tab.
-   - Edit the `config.json` to include the IP addresses of your Android devices and any other required configuration. For example:
-     ```json
-     {
-       "devices": [
-         {
-           "name": "Living Room TV",
-           "ip": "192.168.1.100"
-         },
-         {
-           "name": "Bedroom Tablet",
-           "ip": "192.168.1.101"
-         }
-       ],
-       "additional_config": "your_additional_config_here"
-     }
-     ```
-   - Save the configuration.
-
 4. **Start the Add-on:**
    - Go to the `Info` tab and click the `Start` button.
    - Optionally, enable the `Start on boot` option to ensure the add-on starts automatically when Home Assistant starts.
