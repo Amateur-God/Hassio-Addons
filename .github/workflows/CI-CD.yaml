@@ -212,7 +212,7 @@
             echo "Matrix folder path: ${{ matrix.folder }}"
         - name: Set up build cache
           id: cache
-          uses: actions/cache@v4.0.2
+          uses: actions/cache@v4
           with:
             path: /tmp/.docker-cache
             key: docker-${{ matrix.architecture }}-${{ github.sha }}
@@ -339,7 +339,7 @@
             echo "Matrix folder path: ${{ matrix.folder }}"
         - name: Set up build cache
           id: cache
-          uses: actions/cache@v4.0.2
+          uses: actions/cache@v4
           with:
             path: /tmp/.docker-cache
             key: docker-${{ matrix.architecture }}-${{ github.sha }}
