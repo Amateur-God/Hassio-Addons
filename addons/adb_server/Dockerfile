@@ -4,12 +4,10 @@ FROM ${BUILD_FROM}
 
 # Install necessary packages and wget for downloading tini
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends android-sdk-platform-tools wget bash build-essential cmake git libjson-c-dev libwebsockets-dev dos2unix && \
+    apt-get install -y android-sdk-platform-tools wget bash build-essential cmake git libjson-c-dev libwebsockets-dev dos2unix && \
     rm -rf /var/lib/apt/lists/* && \
     git clone https://github.com/tsl0922/ttyd.git
 
-# Add Android SDK platform-tools to PATH
-ENV PATH="/usr/lib/android-sdk/platform-tools:${PATH}"
 
 WORKDIR /ttyd
 RUN mkdir build
