@@ -11,7 +11,6 @@
 ![Supports i386 Architecture][i386-shield]
 
 [![Github Actions][github-actions-shield]][github-actions]
-![Project Maintenance][maintenance-shield]
 [![GitHub Activity][commits-shield]][commits]
 
 [![Discord][discord-shield]][discord]
@@ -148,7 +147,6 @@ You should have received a copy of the GNU General Public License along with thi
 [i386-shield]: https://img.shields.io/badge/i386-yes-green.svg
 [issue]: https://github.com/Amateur-God/Hassio-Addons/issues
 [license-shield]: https://img.shields.io/github/license/Amateur-God/Hassio-Addons.svg
-[maintenance-shield]: https://img.shields.io/maintenance/yes/2024.svg
 [project-stage-shield]: https://img.shields.io/badge/project%20stage-production%20ready-brightgreen.svg
 [reddit]: https://reddit.com/r/homeassistant
 [releases-shield]: https://img.shields.io/github/release/Amateur-God/Hassio-Addons.svg
