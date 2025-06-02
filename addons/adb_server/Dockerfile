@@ -8,6 +8,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     git clone https://github.com/tsl0922/ttyd.git
 
+# Add Android SDK platform-tools to PATH
+ENV PATH="/usr/lib/android-sdk/platform-tools:${PATH}"
+
 WORKDIR /ttyd
 RUN mkdir build
 WORKDIR /ttyd/build
