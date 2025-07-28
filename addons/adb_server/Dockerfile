@@ -4,10 +4,10 @@ FROM ${BUILD_FROM}
 
 # Install necessary packages and wget for downloading tini
 RUN apt-get update && \
-    apt-get install -y android-sdk-platform-tools wget bash build-essential cmake git libjson-c-dev libwebsockets-dev dos2unix && \
-    rm -rf /var/lib/apt/lists/* && \
-    git clone https://github.com/tsl0922/ttyd.git
+    apt-get install -y --no-install-recommends wget unzip bash build-essential cmake git libjson-c-dev libwebsockets-dev dos2unix && \
+    rm -rf /var/lib/apt/lists/*
 
+RUN git clone https://github.com/tsl0922/ttyd.git
 
 WORKDIR /ttyd
 RUN mkdir build
@@ -15,8 +15,31 @@ WORKDIR /ttyd/build
 RUN cmake .. && \
     make && make install
 
-# Download and install tini based on the target architecture
+
 ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+    "amd64") \
+        echo "Fetching latest amd64 platform-tools from Google" && \
+        wget -q https://dl.google.com/android/repository/platform-tools-latest-linux.zip -O /tmp/platform-tools.zip && \
+        unzip -q /tmp/platform-tools.zip -d /opt && \
+        rm /tmp/platform-tools.zip \
+        ;; \
+    "arm64" | "arm" | "386") \
+        echo "Fetching platform-tools for $TARGETARCH from apt" && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends android-sdk-platform-tools && \
+        rm -rf /var/lib/apt/lists/* \
+        ;; \
+    *) \
+        echo "Unsupported architecture for adb installation: $TARGETARCH" && \
+        exit 1 \
+        ;; \
+    esac
+
+
+ENV PATH="/opt/platform-tools:${PATH}"
+
+# Download and install tini based on the target architecture
 RUN case "$TARGETARCH" in \
     "amd64") TINI_URL="https://github.com/krallin/tini/releases/download/v0.19.0/tini";; \
     "arm64") TINI_URL="https://github.com/krallin/tini/releases/download/v0.19.0/tini-arm64";; \
