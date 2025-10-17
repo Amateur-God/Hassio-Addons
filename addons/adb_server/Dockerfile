@@ -27,7 +27,7 @@ RUN case "$TARGETARCH" in \
     "arm64" | "arm" | "386") \
         echo "Fetching platform-tools for $TARGETARCH from apt" && \
         apt-get update && \
-        apt-get install -y --no-install-recommends android-sdk-platform-tools && \
+        apt-get install -y android-sdk-platform-tools && \
         rm -rf /var/lib/apt/lists/* \
         ;; \
     *) \
