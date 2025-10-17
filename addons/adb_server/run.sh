@@ -10,6 +10,9 @@ ln -sf /config/.android /root/.android
 # Get the configured ADB port
 ADB_PORT=${ADB_PORT:-5037}
 
+# Ensure platform-tools are on PATH at runtime (in case ENV didn't propagate)
+export PATH="/opt/platform-tools:${PATH}"
+
 # Start ADB server
 adb -a -P "${ADB_PORT}" start-server
 echo "ADB server started on port ${ADB_PORT}"

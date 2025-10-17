@@ -17,24 +17,37 @@ RUN cmake .. && \
 
 
 ARG TARGETARCH
+# Install adb / platform-tools in a robust manner:
+# - Prefer the Debian package if available for the target architecture
+# - For amd64, prefer Google's platform-tools zip (gives latest tools)
+# - If packages are not available, try the platform-tools zip as a fallback
 RUN case "$TARGETARCH" in \
     "amd64") \
         echo "Fetching latest amd64 platform-tools from Google" && \
         wget -q https://dl.google.com/android/repository/platform-tools-latest-linux.zip -O /tmp/platform-tools.zip && \
         unzip -q /tmp/platform-tools.zip -d /opt && \
-        rm /tmp/platform-tools.zip \
+        rm /tmp/platform-tools.zip || true ;\
         ;; \
     "arm64" | "arm" | "386") \
-        echo "Fetching platform-tools for $TARGETARCH from apt" && \
+        echo "Attempting to install platform-tools from apt for $TARGETARCH" && \
         apt-get update && \
-        apt-get install -y --no-install-recommends android-sdk-platform-tools && \
-        rm -rf /var/lib/apt/lists/* \
+        apt-get install -y --no-install-recommends android-sdk-platform-tools android-tools-adb adb || true && \
+        rm -rf /var/lib/apt/lists/* ;\
         ;; \
     *) \
-        echo "Unsupported architecture for adb installation: $TARGETARCH" && \
-        exit 1 \
+        echo "Unsupported architecture for adb installation: $TARGETARCH - attempting apt install fallback" && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends android-sdk-platform-tools android-tools-adb adb || true && \
+        rm -rf /var/lib/apt/lists/* ;\
         ;; \
-    esac
+    esac && \
+    # Verify adb is available; if not present try fetching Google's platform-tools as a fallback
+    if ! command -v adb >/dev/null 2>&1 ; then \
+        echo "adb not found after package install, attempting platform-tools zip fallback" && \
+        wget -q https://dl.google.com/android/repository/platform-tools-latest-linux.zip -O /tmp/platform-tools.zip && \
+        unzip -q /tmp/platform-tools.zip -d /opt && \
+        rm -f /tmp/platform-tools.zip || true ; \
+    fi
 
 
 ENV PATH="/opt/platform-tools:${PATH}"
