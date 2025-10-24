@@ -41,6 +41,14 @@ Key features include:
 
 [:books: Read the full add-on documentation][docs]-->
 
+> [!NOTE]
+> **Enjoying this integration?**
+>
+> This is an open-source project I maintain in my spare time. If you'd like to show your appreciation and support its development, you can buy me a coffee!
+>
+> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/amateurgod)
+
+
 ## Usage
 
 ### Prerequisites
