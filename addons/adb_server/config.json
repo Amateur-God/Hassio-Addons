@@ -25,14 +25,10 @@
     "homeassistant_config:rw"
   ],
   "options": {
-    "adb_port": 5037,
-    "auto_connect_devices": []
+    "adb_port": 5037
   },
   "schema": {
-    "adb_port": "port",
-    "auto_connect_devices": [
-      "str"
-    ]
+    "adb_port": "port"
   },
   "image": "docker.io/amateurgod/adb_server"
 }
